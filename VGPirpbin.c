@@ -2404,22 +2404,28 @@ char * BitLevelEncoder_decodeString(BitLevelDecoder * BLD)
 	return c;
 }
 
-
-
-void ProvenanceStep_print(FILE * out, ProvenanceStep * P)
+int ProvenanceStep_print(FILE * out, ProvenanceStep * P)
 {
 	while ( P )
 	{
-		fprintf(out,"!");
+		if ( fprintf(out,"!") < 0 )
+			return -1;
 
-		fprintf(out," %lu %s",(unsigned long)strlen(P->program),P->program);
-		fprintf(out," %lu %s",(unsigned long)strlen(P->version),P->version);
-		fprintf(out," %lu %s",(unsigned long)strlen(P->commandline),P->commandline);
-		fprintf(out," %lu %s",(unsigned long)strlen(P->date),P->date);
-		fprintf(out,"\n");
+		if ( fprintf(out," %lu %s",(unsigned long)strlen(P->program),P->program) < 0 )
+			return -1;
+		if ( fprintf(out," %lu %s",(unsigned long)strlen(P->version),P->version) < 0 )
+			return -1;
+		if ( fprintf(out," %lu %s",(unsigned long)strlen(P->commandline),P->commandline) < 0 )
+			return -1;
+		if ( fprintf(out," %lu %s",(unsigned long)strlen(P->date),P->date) < 0 )
+			return -1;
+		if ( fprintf(out,"\n") < 0 )
+			return -1;
 
 		P = P->next;
 	}
+
+	return 0;
 }
 
 void ProvenanceStep_deallocate(ProvenanceStep * P)
@@ -3777,6 +3783,30 @@ typedef struct _DecodeResult
 	uint64_t Q_l;
 } DecodeResult;
 
+DecodeResult * DecodeResult_allocate()
+{
+	DecodeResult * D = NULL;
+
+	D = (DecodeResult *)malloc(sizeof(DecodeResult));
+
+	if ( ! D )
+		return NULL;
+
+	memset(D,0,sizeof(DecodeResult));
+
+	return D;
+}
+
+void DecodeResult_deallocate(DecodeResult * D)
+{
+	if ( D )
+	{
+		free(D->S);
+		free(D->Q);
+		free(D);
+	}
+}
+
 int decodeSequenceAndQuality(
 	BitLevelDecoder * BLD,
 	QualityHuffman * QH,
@@ -4005,68 +4035,114 @@ int decodeSequenceAndQuality(
 	return returncode;
 }
 
-int checkBinaryFile(char const * fn, ProvenanceStep ** insPS)
+typedef struct _IRPBINDecoder
 {
-	FILE * in = NULL;
-	int returncode = 0;
-	QualityHuffman * QH = NULL;
-	BitLevelDecoder * BLD = NULL;
-	/* uint64_t v; */
-	uint64_t ii;
+	FILE * in;
+	QualityHuffman * QH;
+	BitLevelDecoder * BLD;
+	DecodeResult * DF;
+	DecodeResult * DR;
 	uint64_t reverseQualityTableSize;
-	uint64_t * reverseQualityTable = NULL;
-	uint64_t nr;
-	uint64_t iii;
-	uint64_t indexmod;
-	uint64_t indexpos = 0;
-	DecodeResult DF;
-	DecodeResult DR;
-	char const * cc = NULL;
+	uint64_t * reverseQualityTable;
 	uint64_t HSLo;
-	HeaderStatsLine * HSL = NULL;
-	ProvenanceStep * PS = NULL;
-	HuffmanCode * symCode = NULL;
-	HuffmanCode * lengthsCode = NULL;
+	HeaderStatsLine * HSL;
+	ProvenanceStep * PS;
+	HuffmanCode * symCode;
+	HuffmanCode * lengthsCode;
+	uint64_t nr;
+	uint64_t indexmod;
+	uint64_t indexpos;
+} IRPBINDecoder;
 
-	memset(&DF,0,sizeof(DF));
-	memset(&DR,0,sizeof(DR));
+IRPBINDecoder * IRPBINDecoder_deallocate(IRPBINDecoder * I)
+{
+	if ( I )
+	{
+		if ( I->in )
+			fclose(I->in);
+		QualityHuffman_deallocate(I->QH);
+		BitLevelDecoder_deallocate(I->BLD);
+		DecodeResult_deallocate(I->DF);
+		DecodeResult_deallocate(I->DR);
+		free(I->reverseQualityTable);
+		free(I->HSL);
+		ProvenanceStep_deallocate(I->PS);
+		HuffmanCode_deallocate(I->symCode);
+		HuffmanCode_deallocate(I->lengthsCode);
+		free(I);
+	}
 
-	in = fopen(fn,"rb");
+	return NULL;
+}
 
-	if ( ! in )
+
+IRPBINDecoder * IRPBINDecoder_allocate()
+{
+	IRPBINDecoder * I = NULL;
+
+	I = (IRPBINDecoder *)malloc(sizeof(IRPBINDecoder));
+
+	if ( ! I )
+		return IRPBINDecoder_deallocate(I);
+
+	memset(I,0,sizeof(IRPBINDecoder));
+
+	if ( !(I->DF = DecodeResult_allocate()) )
+		return IRPBINDecoder_deallocate(I);
+
+	if ( !(I->DR = DecodeResult_allocate()) )
+		return IRPBINDecoder_deallocate(I);
+
+	return I;
+}
+
+IRPBINDecoder * IRPBINDecoder_allocateFromFile(char const * fn)
+{
+	IRPBINDecoder * I = NULL;
+	uint64_t iii = 0;
+	uint64_t ii = 0;
+	char const * cc = NULL;
+
+	if ( !(I = IRPBINDecoder_allocate()) )
+	{
+		fprintf(stderr,"[E] failed to allocate memory\n");
+		goto cleanup;
+	}
+
+
+
+	if ( ! (I->in = fopen(fn,"rb")) )
 	{
 		fprintf(stderr,"[E] failed to open file %s\n",fn);
-		returncode = -1;
 		goto cleanup;
 	}
 
 	/* read position of index */
-	FSEEK(in,-(int)sizeof(uint64_t),SEEK_END);
+	FSEEK(I->in,-(int)sizeof(uint64_t),SEEK_END);
 
+	I->indexpos = 0;
 	for ( iii = 0; iii < sizeof(uint64_t); ++iii )
 	{
 		unsigned char c;
-		if ( fread(&c,1,1,in) != 1 )
+		if ( fread(&c,1,1,I->in) != 1 )
 		{
 			fprintf(stderr,"[E] failed to read position of index %s\n",fn);
-			returncode = -1;
 			goto cleanup;
 		}
 
-		indexpos <<= 8;
-		indexpos |= c;
+		I->indexpos <<= 8;
+		I->indexpos |= c;
 	}
 
 	#if 0
 	fprintf(stderr,"index position at %lu\n", (unsigned long)indexpos);
 	#endif
 
-	FSEEK(in,0,SEEK_SET);
+	FSEEK(I->in,0,SEEK_SET);
 
-	if ( ! (BLD = BitLevelDecoder_allocate(in)) )
+	if ( ! (I->BLD = BitLevelDecoder_allocate(I->in)) )
 	{
 		fprintf(stderr,"[E] failed to instantiate bit level decoder for %s\n",fn);
-		returncode = -1;
 		goto cleanup;
 	}
 
@@ -4076,10 +4152,9 @@ int checkBinaryFile(char const * fn, ProvenanceStep ** insPS)
 		uint64_t v;
 		int c;
 
-		if ( BitLevelDecoder_decode(BLD,&v,8) < 0 )
+		if ( BitLevelDecoder_decode(I->BLD,&v,8) < 0 )
 		{
 			fprintf(stderr,"[E] failed to read number of reads in file\n");
-			returncode = -1;
 			goto cleanup;
 		}
 
@@ -4088,84 +4163,58 @@ int checkBinaryFile(char const * fn, ProvenanceStep ** insPS)
 		if ( c != *cc )
 		{
 			fprintf(stderr,"[E] file type mismatch\n");
-			returncode = -1;
 			goto cleanup;
 		}
 	}
 
 	/* read number of pairs in file */
-	if ( BitLevelDecoder_decode(BLD,&nr,64) < 0 )
+	if ( BitLevelDecoder_decode(I->BLD,&(I->nr),64) < 0 )
 	{
 		fprintf(stderr,"[E] failed to read number of reads in file\n");
-		returncode = -1;
 		goto cleanup;
 	}
 
 	/* read size of HeaderStatsLine table */
-	if ( BitLevelDecoder_decode(BLD,&HSLo,64) < 0 )
+	if ( BitLevelDecoder_decode(I->BLD,&(I->HSLo),64) < 0 )
 	{
 		fprintf(stderr,"[E] failed to read number of header objects in file\n");
-		returncode = -1;
 		goto cleanup;
 	}
 
 	/* allocate HeaderStatsLine table */
-	HSL = (HeaderStatsLine *)malloc(HSLo * sizeof(HeaderStatsLine));
-
-	if ( ! HSL )
+	if ( ! (I->HSL = (HeaderStatsLine *)malloc(I->HSLo * sizeof(HeaderStatsLine))) )
 	{
 		fprintf(stderr,"[E] unable to read header objects\n");
-		returncode = -1;
 		goto cleanup;
 	}
 
 	/* read HeaderStatsLine table */
-	for ( ii = 0; ii < HSLo; ++ii )
-		if ( HeaderStatsLine_decode(BLD,&(HSL[ii])) < 0 )
+	for ( ii = 0; ii < I->HSLo; ++ii )
+		if ( HeaderStatsLine_decode(I->BLD,&(I->HSL[ii])) < 0 )
 		{
 			fprintf(stderr,"[E] unable to read header objects\n");
-			returncode = -1;
 			goto cleanup;
 		}
 
 	/* decode provenance lines */
-	if ( !(PS = ProvenanceStep_decode(BLD)) )
+	if ( !(I->PS = ProvenanceStep_decode(I->BLD)) )
 	{
 		fprintf(stderr,"[E] unable to decode provenance\n");
-		returncode = -1;
 		goto cleanup;
 	}
 
-	assert ( PS );
-
-	{
-		ProvenanceStep * PP = PS;
-		assert ( PP );
-
-		while ( PP->next )
-			PP = PP->next;
-
-		PP->next = *insPS;
-		*insPS = NULL;
-	}
-
-	for ( ii = 0; ii < HSLo; ++ii )
-		if ( HSL[ii].type == '#' && HSL[ii].subtype == '!' )
-			HSL[ii].num += 1;
 
 	/* read index mod */
-	if ( BitLevelDecoder_decode(BLD,&indexmod,64) < 0 )
+	if ( BitLevelDecoder_decode(I->BLD,&(I->indexmod),64) < 0 )
 	{
 		fprintf(stderr,"[E] failed to indexmod from file\n");
-		returncode = -1;
 		goto cleanup;
 	}
 
 	/* read huffman tables  */
-	if ( ! (QH = QualityHuffman_decode(BLD)) )
+	if ( ! (I->QH = QualityHuffman_decode(I->BLD)) )
 	{
 		fprintf(stderr,"[E] failed to decode Huffman tables in %s\n",fn);
-		returncode = -1;
 		goto cleanup;
 	}
 
@@ -4179,214 +4228,191 @@ int checkBinaryFile(char const * fn, ProvenanceStep ** insPS)
 	#endif
 
 	/* read size of reverse quality table */
-	if ( BitLevelDecoder_decodeGamma(BLD,&reverseQualityTableSize) < 0 )
+	if ( BitLevelDecoder_decodeGamma(I->BLD,&(I->reverseQualityTableSize)) < 0 )
 	{
 		fprintf(stderr,"[E] unable to decode size of reverse quality table from %s\n",fn);
-		returncode = -1;
 		goto cleanup;
 	}
 
 	/* allocate memory for reverse quality table */
-	if ( ! (reverseQualityTable = (uint64_t *)malloc(sizeof(uint64_t)*reverseQualityTableSize)) )
+	if ( ! (I->reverseQualityTable = (uint64_t *)malloc(sizeof(uint64_t)*I->reverseQualityTableSize)) )
 	{
 		fprintf(stderr,"[E] unable to allocate memory for reverse quality table from %s\n",fn);
-		returncode = -1;
 		goto cleanup;
 	}
 
 	/* decode reverse quality table */
-	for ( ii = 0; ii < reverseQualityTableSize; ++ii )
-		if ( BitLevelDecoder_decodeGamma(BLD,&reverseQualityTable[ii]) < 0 )
+	for ( ii = 0; ii < I->reverseQualityTableSize; ++ii )
+		if ( BitLevelDecoder_decodeGamma(I->BLD,&(I->reverseQualityTable[ii])) < 0 )
 		{
 			fprintf(stderr,"[E] unable to decode reverse quality table from %s\n",fn);
-			returncode = -1;
 			goto cleanup;
 		}
 
-	if ( ! (symCode = HuffmanCode_decode(BLD)) )
+	if ( ! (I->symCode = HuffmanCode_decode(I->BLD)) )
 	{
 		fprintf(stderr,"[E] unable to decode sym huffman table from %s\n",fn);
-		returncode = -1;
 		goto cleanup;
 	}
 
-	if ( ! (lengthsCode = HuffmanCode_decode(BLD)) )
+	if ( ! (I->lengthsCode = HuffmanCode_decode(I->BLD)) )
 	{
 		fprintf(stderr,"[E] unable to decode sym huffman table from %s\n",fn);
-		returncode = -1;
 		goto cleanup;
 	}
 
 	fprintf(stderr,"[V] sym huffman table\n");
-	printCodeTable(stderr,symCode->CT);
+	printCodeTable(stderr,I->symCode->CT);
 	fprintf(stderr,"[V] lengths huffman table\n");
-	printCodeTable(stderr,lengthsCode->CT);
+	printCodeTable(stderr,I->lengthsCode->CT);
 
-	DF.S = DF.Q = NULL;
-	DF.S_o = DF.Q_o = 0;
-	DR.S = DR.Q = NULL;
-	DR.S_o = DR.Q_o = 0;
+	return I;
 
-	fprintf(stdout,"1 3 seq 1 0\n");
-	fprintf(stdout,"2 3 irp\n");
+	cleanup:
+	return IRPBINDecoder_deallocate(I);
+}
 
-	for ( ii = 0; ii < HSLo; ++ii )
+void ProvenanceStep_addStep(IRPBINDecoder * I, ProvenanceStep ** insPS)
+{
+	uint64_t ii;
+
+	assert ( I->PS );
+
 	{
-		fprintf(stdout,"%c %c %lu\n", HSL[ii].type, HSL[ii].subtype, (unsigned long)HSL[ii].num);
+		ProvenanceStep * PP = I->PS;
+		assert ( PP );
+
+		while ( PP->next )
+			PP = PP->next;
+
+		PP->next = *insPS;
+		*insPS = NULL;
 	}
 
-	ProvenanceStep_print(stdout, PS);
+	for ( ii = 0; ii < I->HSLo; ++ii )
+		if ( I->HSL[ii].type == '#' && I->HSL[ii].subtype == '!' )
+			I->HSL[ii].num += 1;
+}
 
-	/* while ( BitLevelDecoder_decode(BLD,&v,8) == 0 && v == 'P' ) */
-	for ( iii = 0; iii < nr; ++iii )
+int IRPBINDecoder_printHeader(IRPBINDecoder const * I, FILE * out)
+{
+	int returncode = 0;
+	uint64_t ii = 0;
+
+	if ( (returncode == 0) && (fprintf(out,"1 3 seq 1 0\n") < 0) )
+		returncode = -1;
+	if ( (returncode == 0) && (fprintf(out,"2 3 irp\n") < 0) )
+		returncode = -1;
+
+	for ( ii = 0; (returncode == 0) && (ii < I->HSLo); ++ii )
+		if ( (returncode == 0) && fprintf(out,"%c %c %lu\n", I->HSL[ii].type, I->HSL[ii].subtype, (unsigned long)(I->HSL[ii].num)) < 0 )
+			returncode = -1;
+
+	if ( (returncode == 0) && (ProvenanceStep_print(out, I->PS) < 0) )
+		returncode = -1;
+
+	return returncode;
+}
+
+int IRPBINDecoder_decodePair(IRPBINDecoder * I)
+{
+	int64_t llv;
+	if ( (llv = HuffmanCode_decodeSymbol(I->symCode, I->BLD)) < 0 || llv != 'P' )
 	{
-		int64_t llv;
-		if ( (llv = HuffmanCode_decodeSymbol(symCode, BLD)) < 0 || llv != 'P' )
+		fprintf(stderr,"[E] unable to read P marker\n");
+		return -1;
+	}
+
+	if ( decodeSequenceAndQuality(I->BLD,I->QH,I->symCode,I->lengthsCode,I->reverseQualityTable,I->DF) < 0 )
+	{
+		fprintf(stderr,"[E] unable to read forward data\n");
+		return -1;
+	}
+
+	if ( decodeSequenceAndQuality(I->BLD,I->QH,I->symCode,I->lengthsCode,I->reverseQualityTable,I->DR) < 0 )
+	{
+		fprintf(stderr,"[E] unable to read reverse data\n");
+		return -1;
+	}
+
+	return 0;
+}
+
+int IRPBINDecoder_printPair(IRPBINDecoder const * I, FILE * out)
+{
+	if ( fprintf(out,"P\n") < 0 )
+		return -1;
+
+	if ( fprintf(out,"S %lu ",(unsigned long)I->DF->S_l) < 0 )
+		return -1;
+	if ( fwrite(I->DF->S,I->DF->S_l,1,out) != 1 )
+		return -1;
+	if ( fprintf(out,"\n") < 0 )
+		return -1;
+
+	if ( fprintf(out,"Q %lu ",(unsigned long)I->DF->Q_l) < 0 )
+		return -1;
+	if ( fwrite(I->DF->Q,I->DF->Q_l,1,out) != 1 )
+		return -1;
+	if ( fprintf(out,"\n") < 0 )
+		return -1;
+
+	if ( fprintf(out,"S %lu ",(unsigned long)I->DR->S_l) < 0 )
+		return -1;
+	if ( fwrite(I->DR->S,I->DR->S_l,1,out) != 1 )
+		return -1;
+	if ( fprintf(out,"\n") < 0 )
+		return -1;
+
+	if ( fprintf(out,"Q %lu ",(unsigned long)I->DR->Q_l) < 0 )
+		return -1;
+	if ( fwrite(I->DR->Q,I->DR->Q_l,1,out) != 1 )
+		return -1;
+	if ( fprintf(out,"\n") < 0 )
+		return -1;
+
+	return 0;
+}
+
+int checkBinaryFile(char const * fn, ProvenanceStep ** insPS)
+{
+	int returncode = 0;
+	/* uint64_t ii; */
+	uint64_t iii;
+
+	IRPBINDecoder * I = NULL;
+
+	if ( ! (I = IRPBINDecoder_allocateFromFile(fn)) )
+	{
+		returncode = -1;
+		goto cleanup;
+	}
+
+	ProvenanceStep_addStep(I,insPS);
+
+	if ( IRPBINDecoder_printHeader(I,stdout) < 0 )
+	{
+		returncode = -1;
+		goto cleanup;
+	}
+
+	for ( iii = 0; iii < I->nr; ++iii )
+	{
+		if ( IRPBINDecoder_decodePair(I) < 0 )
 		{
-			fprintf(stderr,"[E] unable to read P marker\n");
-			returncode = -1;
+			fprintf(stderr,"[E] failed to decode pair\n");
 			goto cleanup;
 		}
 
-		if ( decodeSequenceAndQuality(BLD,QH,symCode,lengthsCode,reverseQualityTable,&DF) < 0 )
+		if ( IRPBINDecoder_printPair(I, stdout) < 0 )
 		{
-			fprintf(stderr,"[E] unable to read forward data\n");
-			returncode = -1;
+			fprintf(stderr,"[E] failed to print pair\n");
 			goto cleanup;
 		}
-
-		if ( decodeSequenceAndQuality(BLD,QH,symCode,lengthsCode,reverseQualityTable,&DR) < 0 )
-		{
-			fprintf(stderr,"[E] unable to read reverse data\n");
-			returncode = -1;
-			goto cleanup;
-		}
-
-		fprintf(stdout,"P\n");
-
-		fprintf(stdout,"S %lu ",(unsigned long)DF.S_l);
-		fwrite(DF.S,DF.S_l,1,stdout);
-		fprintf(stdout,"\n");
-
-		fprintf(stdout,"Q %lu ",(unsigned long)DF.Q_l);
-		fwrite(DF.Q,DF.Q_l,1,stdout);
-		fprintf(stdout,"\n");
-
-		fprintf(stdout,"S %lu ",(unsigned long)DR.S_l);
-		fwrite(DR.S,DR.S_l,1,stdout);
-		fprintf(stdout,"\n");
-
-		fprintf(stdout,"Q %lu ",(unsigned long)DR.Q_l);
-		fwrite(DR.Q,DR.Q_l,1,stdout);
-		fprintf(stdout,"\n");
-
-		#if 0
-		uint64_t seqlen;
-		uint64_t qlen;
-		uint64_t i;
-
-		if ( BitLevelDecoder_decode(BLD,&v,8) < 0 && v != 'S' )
-		{
-			fprintf(stderr,"[E] failed to find sequence after P marker\n");
-			returncode = -1;
-			goto cleanup;
-		}
-
-		if ( BitLevelDecoder_decodeGamma(BLD,&seqlen) < 0 )
-		{
-			fprintf(stderr,"[E] failed to read sequence length after P marker\n");
-			returncode = -1;
-			goto cleanup;
-		}
-
-		/* fprintf(stderr,"seqlen %lu\n", (unsigned long)seqlen); */
-
-		for ( i = 0; i < seqlen; ++i )
-		{
-			uint64_t sym;
-			if ( BitLevelDecoder_decode(BLD,&sym,2) < 0 )
-			{
-				fprintf(stderr,"[E] failed to decode symbol\n");
-				returncode = -1;
-				goto cleanup;
-			}
-
-			fprintf(stderr,"%d", (int)sym);
-		}
-
-		fprintf(stderr,"\n");
-
-		if ( BitLevelDecoder_decode(BLD,&v,8) < 0 && v != 'Q' )
-		{
-			fprintf(stderr,"[E] failed to find Q marker after sequence\n");
-			returncode = -1;
-			goto cleanup;
-		}
-
-		if ( BitLevelDecoder_decodeGamma(BLD,&qlen) < 0 )
-		{
-			fprintf(stderr,"[E] failed to read Q length after Q marker\n");
-			returncode = -1;
-			goto cleanup;
-		}
-
-		/* fprintf(stderr,"qlen %lu\n", (unsigned long)qlen); */
-
-		int64_t const firstqualsym =
-			HuffmanCode_decodeSymbol(QH->firstHuf, BLD);
-
-		if ( firstqualsym < 0 )
-		{
-			fprintf(stderr,"[E] failed to read first quality value\n");
-			returncode = -1;
-			goto cleanup;
-		}
-
-		int64_t const firstqual = reverseQualityTable[firstqualsym];
-		int64_t prevqual = firstqualsym;
-
-		/* fprintf(stderr,"firstqualsym %d firstqual %d\n", (int)firstqualsym, (int)firstqual); */
-		fprintf(stderr,"%c",(char)(firstqual + PHREDSHIFT));
-
-		for ( i = 1; i < qlen; ++i )
-		{
-			int64_t const difsym = HuffmanCode_decodeSymbol(QH->difHuf, BLD);
-			int64_t dif;
-			int64_t nextqual;
-			int64_t nextqualvalue;
-
-			if ( (difsym & 1) )
-				dif = -(difsym ^ 1)/2;
-			else
-				dif =  (difsym/2) - 1;
-
-			nextqual      = prevqual + dif;
-			nextqualvalue = reverseQualityTable[nextqual];
-
-			/* fprintf(stderr,"nextqualsym %d nextqual %d sym %c\n", (int)nextqual, (int)nextqualvalue, (char)(nextqualvalue+PHREDSHIFT)); */
-			fprintf(stderr,"%c",(int)(nextqualvalue+PHREDSHIFT));
-
-			prevqual = nextqual;
-		}
-
-		fprintf(stderr,"\n");
-		#endif
 	}
 
 	cleanup:
-	if ( in )
-		fclose(in);
-	QualityHuffman_deallocate(QH);
-	BitLevelDecoder_deallocate(BLD);
-	HuffmanCode_deallocate(symCode);
-	HuffmanCode_deallocate(lengthsCode);
-	free(reverseQualityTable);
-	free(DF.S);
-	free(DF.Q);
-	free(DR.S);
-	free(DR.Q);
-	free(HSL);
-	ProvenanceStep_deallocate(PS);
+	IRPBINDecoder_deallocate(I);
 
 	return returncode;
 }
