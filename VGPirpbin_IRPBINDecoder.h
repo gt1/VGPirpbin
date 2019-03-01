@@ -40,6 +40,8 @@ typedef struct _IRPBINDecoder
 	uint64_t nr;
 	uint64_t indexmod;
 	uint64_t indexpos;
+	char * groupname;
+	uint64_t groupsize;
 } IRPBINDecoder;
 
 int IRPBINDecoder_decodeSequenceAndQuality(

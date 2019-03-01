@@ -574,6 +574,68 @@ int VGP_IRPBIN_produceBinary(FILE * out, FILE * in, QualityHuffman const * QH, T
 					goto cleanup;
 				}
 			}
+			else if ( linetype == 'g' )
+			{
+				int64_t ng = 0;
+				CString Gname;
+
+				a += 1;
+
+				if ( ! expect(&a,&e,' ') )
+				{
+					fprintf(stderr,"[E] malformed g line\n");
+					returnvalue = -1;
+					goto cleanup;
+				}
+
+				if ( (ng = getNumber(&a,&e)) < 0 )
+				{
+					fprintf(stderr,"[E] malformed g line\n");
+					returnvalue = -1;
+					goto cleanup;
+				}
+
+				if ( ! expect(&a,&e,' ') )
+				{
+					fprintf(stderr,"[E] malformed g line\n");
+					returnvalue = -1;
+					goto cleanup;
+				}
+
+				Gname = CString_getString(&a,&e);
+
+				if ( ! Gname.a )
+				{
+					fprintf(stderr,"[E] malformed g line\n");
+					returnvalue = -1;
+					goto cleanup;
+				}
+
+				#if 0
+				fprintf(stderr,"Found group %lu ", (unsigned long)ng);
+				fwrite(Gname.a,Gname.e-Gname.a,1,stderr);
+				fprintf(stderr,"\n");
+				#endif
+
+				if ( HuffmanCode_encodeSymbol(BLE, symCode, 'g' ) < 0 )
+				{
+					fprintf(stderr,"[E] HuffmanCode_encode(g) failed\n");
+					returnvalue = -1;
+					goto cleanup;
+				}
+				if ( BitLevelEncoder_encodeGamma(BLE, ng) < 0 )
+				{
+					fprintf(stderr,"[E] Unable to write group size\n");
+					returnvalue = -1;
+					goto cleanup;
+				}
+				if ( BitLevelEncoder_encodeStringP(BLE, Gname.a, Gname.e) < 0 )
+				{
+					fprintf(stderr,"[E] Unable to write group name\n");
+					returnvalue = -1;
+					goto cleanup;
+				}
+			}
 			else if ( linetype == 'Q' )
 			{
 				CString QS;

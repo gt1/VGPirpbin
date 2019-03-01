@@ -16,6 +16,8 @@
 **/
 #include "VGPirpbin_decodeBinaryFile.h"
 #include <time.h>
+#include <assert.h>
+#include <stdlib.h>
 
 int VGP_IRPBIN_decodeBinaryFile(char const * fn, ProvenanceStep ** insPS, char const * binfiletype)
 {
@@ -45,10 +47,27 @@ int VGP_IRPBIN_decodeBinaryFile(char const * fn, ProvenanceStep ** insPS, char c
 	t0 = t;
 	while ( iii < I->nr )
 	{
-		if ( IRPBINDecoder_decodePair(I) < 0 )
+		int r0;
+		r0 = IRPBINDecoder_decodePair(I);
+
+		if ( r0 < 0 )
 		{
 			fprintf(stderr,"[E] failed to decode pair\n");
 			goto cleanup;
+		}
+		else if ( r0 > 0 )
+		{
+			/* fprintf(stderr,"[V] found group\n"); */
+			fprintf(stdout,"g %lu %s\n", I->groupsize, I->groupname);
+
+			free(I->groupname);
+			I->groupname = NULL;
+
+			continue;
+		}
+		else
+		{
+			assert ( r0 == 0 );
 		}
 
 		if ( IRPBINDecoder_printPair(I, stdout) < 0 )
