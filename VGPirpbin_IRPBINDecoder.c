@@ -40,7 +40,7 @@ int IRPBINDecoder_decodeSequenceAndQuality(
 
 	if ( (llv = HuffmanCode_decodeSymbol(symCode, BLD)) < 0 || llv != 'S' )
 	{
-		fprintf(stderr,"[E] failed to find sequence after P marker\n");
+		fprintf(stderr,"[E] failed to find S marker after P marker\n");
 		returncode = -1;
 		goto cleanup;
 	}
@@ -510,10 +510,47 @@ int IRPBINDecoder_printHeader(IRPBINDecoder const * I, FILE * out)
 int IRPBINDecoder_decodePair(IRPBINDecoder * I)
 {
 	int64_t llv;
-	if ( (llv = HuffmanCode_decodeSymbol(I->symCode, I->BLD)) < 0 || llv != 'P' )
+	if ( (llv = HuffmanCode_decodeSymbol(I->symCode, I->BLD)) < 0 )
 	{
-		fprintf(stderr,"[E] unable to read P marker\n");
+		fprintf(stderr,"[E] unable to read marker\n");
 		return -1;
+	}
+
+	switch ( llv )
+	{
+		case 'P':
+		{
+			break;
+		}
+		case 'g':
+		{
+			uint64_t groupsize;
+			char * groupname = NULL;
+
+			if ( BitLevelDecoder_decodeGamma(I->BLD,&groupsize) < 0 )
+			{
+				fprintf(stderr,"[E] failed to read group size after g marker\n");
+				return -1;
+			}
+
+			if ( ! (groupname = BitLevelDecoder_decodeString(I->BLD)) )
+			{
+				fprintf(stderr,"[E] failed to read group name after g marker\n");
+				return -1;
+			}
+
+			/* fprintf(stderr,"[V] found group %s of size %lu\n", groupname, (unsigned long)groupsize); */
+
+			I->groupname = groupname;
+			I->groupsize = groupsize;
+
+			/* free(groupname); */
+
+			return 1;
+		}
+		default:
+			return -1;
+			break;
 	}
 
 	if ( IRPBINDecoder_decodeSequenceAndQuality(I->BLD,I->QH,I->symCode,I->lengthsCode,I->reverseQualityTable,I->DF) < 0 )
