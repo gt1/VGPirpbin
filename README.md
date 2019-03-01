@@ -1,4 +1,4 @@
-# VGPirp
+# VGPirpbin
 Text to binary and binary to text converter for the IRP file format
 
 # usage:
