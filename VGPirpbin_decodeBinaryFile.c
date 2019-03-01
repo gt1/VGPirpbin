@@ -15,11 +15,15 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 **/
 #include "VGPirpbin_decodeBinaryFile.h"
+#include <time.h>
 
 int VGP_IRPBIN_decodeBinaryFile(char const * fn, ProvenanceStep ** insPS, char const * binfiletype)
 {
 	int returncode = 0;
-	uint64_t iii;
+	uint64_t iii = 0;
+	uint64_t s = 0;
+	time_t t;
+	time_t t0;
 
 	IRPBINDecoder * I = NULL;
 
@@ -37,7 +41,9 @@ int VGP_IRPBIN_decodeBinaryFile(char const * fn, ProvenanceStep ** insPS, char c
 		goto cleanup;
 	}
 
-	for ( iii = 0; iii < I->nr; ++iii )
+	t = time(NULL);
+	t0 = t;
+	while ( iii < I->nr )
 	{
 		if ( IRPBINDecoder_decodePair(I) < 0 )
 		{
@@ -49,6 +55,21 @@ int VGP_IRPBIN_decodeBinaryFile(char const * fn, ProvenanceStep ** insPS, char c
 		{
 			fprintf(stderr,"[E] failed to print pair\n");
 			goto cleanup;
+		}
+
+		s += I->DF->S_o;
+		s += I->DR->S_o;
+		s += I->DF->Q_o;
+		s += I->DR->Q_o;
+
+		iii += 1;
+		if ( iii % (1024*1024)  == 0 )
+		{
+			time_t const tn = time(NULL);
+
+			fprintf(stderr,"[V] decoded %lu time %lu acc time %lu syms %lu syms/sec %f\n",(unsigned long)iii,(unsigned long)(tn-t),(unsigned long)(tn-t0),(unsigned long)s, s/(double)(tn-t0));
+
+			t = tn;
 		}
 	}
 
