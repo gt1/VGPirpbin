@@ -36,4 +36,5 @@ int BitLevelEncoder_encode(BitLevelEncoder * enc, uint64_t codeword, unsigned in
 int BitLevelEncoder_encodeGamma(BitLevelEncoder * enc, uint64_t v);
 int BitLevelEncoder_deallocate(BitLevelEncoder * enc);
 int BitLevelEncoder_encodeString(BitLevelEncoder * BLE, char const * c);
+int BitLevelEncoder_encodeStringP(BitLevelEncoder * BLE, char const * c, char const * e);
 #endif

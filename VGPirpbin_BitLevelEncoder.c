@@ -158,3 +158,18 @@ int BitLevelEncoder_encodeString(BitLevelEncoder * BLE, char const * c)
 
 	return 0;
 }
+
+int BitLevelEncoder_encodeStringP(BitLevelEncoder * BLE, char const * c, char const * e)
+{
+	size_t const l = e-c;
+	size_t i;
+
+	if ( BitLevelEncoder_encodeGamma(BLE,l) < 0 )
+		return -1;
+
+	for ( i = 0; i < l; ++i )
+		if ( BitLevelEncoder_encode(BLE,c[i],8) < 0 )
+			return -1;
+
+	return 0;
+}
