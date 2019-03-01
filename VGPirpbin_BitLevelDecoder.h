@@ -35,4 +35,5 @@ int BitLevelDecoder_decodeGamma(BitLevelDecoder * BLV, uint64_t * v);
 void BitLevelDecoder_deallocate(BitLevelDecoder * BLV);
 int BitLevelDecoder_decode(BitLevelDecoder * BLV, uint64_t * v, unsigned int l);
 char * BitLevelDecoder_decodeString(BitLevelDecoder * BLD);
+int BitLevelDecoder_seek(BitLevelDecoder * BLD, uint64_t const p);
 #endif

@@ -32,6 +32,26 @@ BitLevelDecoder * BitLevelDecoder_allocate(FILE * in)
 	return BLD;
 }
 
+int BitLevelDecoder_seek(BitLevelDecoder * BLD, uint64_t const p)
+{
+	uint64_t const b = p/CHAR_BIT;
+	uint64_t r = p - b * CHAR_BIT;
+
+	BLD->c = 0;
+	BLD->f = 0;
+
+	if ( FSEEK(BLD->in,b,SEEK_SET) < 0 )
+		return -1;
+
+	while ( r )
+		if ( BitLevelDecoder_getBit(BLD) < 0 )
+			return -1;
+		else
+			r -= 1;
+
+	return 0;
+}
+
 int BitLevelDecoder_load(BitLevelDecoder * BLV)
 {
 	assert ( BLV->f == 0 );
