@@ -59,4 +59,5 @@ void IRPBINDecoder_addStep(IRPBINDecoder * I, ProvenanceStep ** insPS);
 int IRPBINDecoder_printHeader(IRPBINDecoder const * I, FILE * out);
 int IRPBINDecoder_decodePair(IRPBINDecoder * I);
 int IRPBINDecoder_printPair(IRPBINDecoder const * I, FILE * out);
+int IRPBINDecoder_seek(IRPBINDecoder * I, uint64_t i);
 #endif
