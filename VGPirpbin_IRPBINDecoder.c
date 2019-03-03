@@ -549,8 +549,11 @@ int IRPBINDecoder_decodePair(IRPBINDecoder * I)
 			return 1;
 		}
 		default:
+		{
+			fprintf(stderr,"[E] unknown marker %c\n", (char)llv);
 			return -1;
 			break;
+		}
 	}
 
 	if ( IRPBINDecoder_decodeSequenceAndQuality(I->BLD,I->QH,I->symCode,I->lengthsCode,I->reverseQualityTable,I->DF) < 0 )
@@ -600,6 +603,44 @@ int IRPBINDecoder_printPair(IRPBINDecoder const * I, FILE * out)
 		return -1;
 	if ( fprintf(out,"\n") < 0 )
 		return -1;
+
+	return 0;
+}
+
+#include <limits.h>
+
+int IRPBINDecoder_seek(IRPBINDecoder * I, uint64_t i)
+{
+	uint64_t blockid;
+	uint64_t blockmod;
+	uint64_t filepos;
+
+	if ( i > I->nr )
+		i = I->nr;
+
+	blockid = i / I->indexmod;
+	blockmod = i - (blockid * I->indexmod);
+
+	if ( BitLevelDecoder_seek(I->BLD,I->indexpos + blockid * CHAR_BIT * sizeof(uint64_t)) < 0 )
+		return -1;
+
+	if ( BitLevelDecoder_decode(I->BLD,&filepos,64) < 0 )
+		return -1;
+
+	fprintf(stderr,"file position is %lu\n", (unsigned long)filepos);
+
+	if ( BitLevelDecoder_seek(I->BLD,filepos) < 0 )
+		return -1;
+
+	while ( blockmod )
+	{
+		int const r = IRPBINDecoder_decodePair(I);
+
+		if ( r < 0 )
+			return -1;
+		else if ( r == 0 )
+			blockmod -= 1;
+	}
 
 	return 0;
 }
