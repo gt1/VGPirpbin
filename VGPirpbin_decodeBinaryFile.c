@@ -43,6 +43,8 @@ int VGP_IRPBIN_decodeBinaryFile(char const * fn, ProvenanceStep ** insPS, char c
 		goto cleanup;
 	}
 
+	IRPBINDecoder_seek(I,0);
+
 	t = time(NULL);
 	t0 = t;
 	while ( iii < I->nr )
