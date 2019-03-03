@@ -18,6 +18,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <limits.h>
 
 int IRPBINDecoder_decodeSequenceAndQuality(
 	BitLevelDecoder * BLD,
@@ -607,7 +608,6 @@ int IRPBINDecoder_printPair(IRPBINDecoder const * I, FILE * out)
 	return 0;
 }
 
-#include <limits.h>
 
 int IRPBINDecoder_seek(IRPBINDecoder * I, uint64_t i)
 {
