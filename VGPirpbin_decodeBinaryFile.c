@@ -58,7 +58,7 @@ int VGP_IRPBIN_decodeBinaryFile(char const * fn, ProvenanceStep ** insPS, char c
 		else if ( r0 > 0 )
 		{
 			/* fprintf(stderr,"[V] found group\n"); */
-			fprintf(stdout,"g %lu %s\n", I->groupsize, I->groupname);
+			fprintf(stdout,"g %lu %lu %s\n", I->groupsize, strlen(I->groupname), I->groupname);
 
 			free(I->groupname);
 			I->groupname = NULL;
