@@ -18,6 +18,7 @@
 #include <time.h>
 #include <assert.h>
 #include <stdlib.h>
+#include <string.h>
 
 int VGP_IRPBIN_decodeBinaryFile(char const * fn, ProvenanceStep ** insPS, char const * binfiletype)
 {
