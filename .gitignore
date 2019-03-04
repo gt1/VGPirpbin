@@ -2,3 +2,5 @@
 VGPirpbin
 removespace.sh
 *.bsq
+*.o
+*.a
