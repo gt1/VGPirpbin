@@ -1,8 +1,44 @@
 CC ?= cc
-CFLAGS ?= -O3 -g
+CFLAGS ?= -O3 -g -ansi -pedantic
 CPPFLAGS ?= -W -Wall
 
-all: VGPirpbin
+BINARIES=VGPirpbin
+LIBRARIES=libVGPirpbin.a
+
+all: ${BINARIES}
+
+LIBHEADERS = \
+	VGPirpbin_Arguments.h \
+	VGPirpbin_BitLevelDecoder.h \
+	VGPirpbin_BitLevelEncoder.h \
+	VGPirpbin_CodeTableEntry.h \
+	VGPirpbin_CodeTable.h \
+	VGPirpbin_CString.h \
+	VGPirpbin_decodeBinaryFile.h \
+	VGPirpbin_DecodeResult.h \
+	VGPirpbin_expect.h \
+	VGPirpbin_getBinaryFileType.h \
+	VGPirpbin_getNumber.h \
+	VGPirpbin_getQualityCode.h \
+	VGPirpbin_getQualityTable.h \
+	VGPirpbin_HeaderStatsLine.h \
+	VGPirpbin_HuffmanCode.h \
+	VGPirpbin_HuffmanDecodeQueueEntry.h \
+	VGPirpbin_HuffmanInnerNode.h \
+	VGPirpbin_HuffmanInnerTable.h \
+	VGPirpbin_IRPBinDecoderContext.h \
+	VGPirpbin_IRPBINDecoder.h \
+	VGPirpbin_IRPBINDecoderInput.h \
+	VGPirpbin_LineBuffer.h \
+	VGPirpbin_mconcat.h \
+	VGPirpbin_mstrdup.h \
+	VGPirpbin_Pair.h \
+	VGPirpbin_PairTable.h \
+	VGPirpbin_pre.h \
+	VGPirpbin_produceBinary.h \
+	VGPirpbin_ProvenanceStep.h \
+	VGPirpbin_QualityHuffman.h \
+	VGPirpbin_Table.h \
 
 VGPirpbin_Arguments.o: VGPirpbin_Arguments.c
 	${CC} ${CFLAGS} ${CPPFLAGS} -c VGPirpbin_Arguments.c -o VGPirpbin_Arguments.o
@@ -107,5 +143,19 @@ clean:
 
 distclean: clean
 	rm -f VGPirpbin
+
+DESTDIR ?=
+PREFIX ?= /usr/local
+BINDIR ?= $(PREFIX)/bin
+INCLUDEDIR ?= $(PREFIX)/include
+LIBDIR ?= $(PREFIX)/lib
+
+install: ${LIBRARIES} VGPirpbin
+	mkdir -p $(DESTDIR)$(BINDIR)
+	mkdir -p $(DESTDIR)$(LIBDIR)
+	mkdir -p $(DESTDIR)$(INCLUDEDIR)
+	cp ${LIBRARIES} $(DESTDIR)$(LIBDIR)/
+	cp ${LIBHEADERS} $(DESTDIR)$(INCLUDEDIR)/
+	cp ${BINARIES} $(DESTDIR)$(BINDIR)
 
 #	cc -W -Wall -O3 -ansi -pedantic VGPirpbin.c -o VGPirpbin
