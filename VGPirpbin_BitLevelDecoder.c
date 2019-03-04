@@ -67,11 +67,16 @@ int BitLevelDecoder_load(BitLevelDecoder * BLV)
 int BitLevelDecoder_tell(BitLevelDecoder * BLV, uint64_t * p)
 {
 	int64_t const fp = FTELL(BLV->in);
+	uint64_t const ufp = fp;
+	uint64_t const ufpb = ufp * CHAR_BIT;
 
 	if ( fp < 0 )
 		return -1;
 
-	*p = (CHAR_BIT * (uint64_t)fp) + ((CHAR_BIT - BLV->f) % CHAR_BIT);
+	if ( BLV->f == 0 )
+		*p = ufpb;
+	else
+		*p = ufpb - BLV->f;
 
 	return 0;
 }
