@@ -18,7 +18,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-IRPBinDecoderContext * IRPBinDecoderContext_allocate(char const * fn)
+IRPBinDecoderContext * IRPBinDecoderContext_allocate(char const * fn, uint64_t const rn)
 {
 	IRPBinDecoderContext * I = NULL;
 
@@ -37,6 +37,8 @@ IRPBinDecoderContext * IRPBinDecoderContext_allocate(char const * fn)
 
 	if ( ! (I->IN = IRPBINDecoder_Input_allocate(fn)) )
 		return IRPBinDecoderContext_deallocate(I);
+
+	I->n = rn;
 
 	return I;
 }

@@ -25,6 +25,7 @@ int VGP_IRPBIN_decodeBinaryFile(char const * fn, ProvenanceStep ** insPS, char c
 	int returncode = 0;
 	uint64_t iii = 0;
 	uint64_t s = 0;
+	int done = 0;
 	time_t t;
 	time_t t0;
 	IRPBINDecoder * I = NULL;
@@ -52,9 +53,10 @@ int VGP_IRPBIN_decodeBinaryFile(char const * fn, ProvenanceStep ** insPS, char c
 
 	t = time(NULL);
 	t0 = t;
-	while ( iii < I->nr )
+	while ( !done )
 	{
 		int r0;
+
 		r0 = IRPBINDecoder_decodePair(I,context);
 
 		if ( r0 < 0 )
@@ -62,40 +64,42 @@ int VGP_IRPBIN_decodeBinaryFile(char const * fn, ProvenanceStep ** insPS, char c
 			fprintf(stderr,"[E] failed to decode pair\n");
 			goto cleanup;
 		}
-		else if ( r0 > 0 )
+		else if ( r0 == 0 )
+		{
+			done = 1;
+		}
+		else if ( r0 == 2 )
 		{
 			/* fprintf(stderr,"[V] found group\n"); */
 			fprintf(stdout,"g %lu %lu %s\n", context->groupsize, strlen(context->groupname), context->groupname);
 
 			free(context->groupname);
 			context->groupname = NULL;
-
-			continue;
 		}
 		else
 		{
-			assert ( r0 == 0 );
-		}
+			assert ( r0 == 1 );
 
-		if ( IRPBinDecoderContext_printPair(context, stdout) < 0 )
-		{
-			fprintf(stderr,"[E] failed to print pair\n");
-			goto cleanup;
-		}
+			if ( IRPBinDecoderContext_printPair(context, stdout) < 0 )
+			{
+				fprintf(stderr,"[E] failed to print pair\n");
+				goto cleanup;
+			}
 
-		s += context->DF->S_o;
-		s += context->DR->S_o;
-		s += context->DF->Q_o;
-		s += context->DR->Q_o;
+			s += context->DF->S_o;
+			s += context->DR->S_o;
+			s += context->DF->Q_o;
+			s += context->DR->Q_o;
 
-		iii += 1;
-		if ( iii % (1024*1024)  == 0 )
-		{
-			time_t const tn = time(NULL);
+			iii += 1;
+			if ( iii % (1024*1024)  == 0 )
+			{
+				time_t const tn = time(NULL);
 
-			fprintf(stderr,"[V] decoded %lu time %lu acc time %lu syms %lu syms/sec %f\n",(unsigned long)iii,(unsigned long)(tn-t),(unsigned long)(tn-t0),(unsigned long)s, s/(double)(tn-t0));
+				fprintf(stderr,"[V] decoded %lu time %lu acc time %lu syms %lu syms/sec %f\n",(unsigned long)iii,(unsigned long)(tn-t),(unsigned long)(tn-t0),(unsigned long)s, s/(double)(tn-t0));
 
-			t = tn;
+				t = tn;
+			}
 		}
 	}
 

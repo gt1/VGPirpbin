@@ -29,9 +29,11 @@ typedef struct _IRPBinDecoderContext
         DecodeResult * DF;
         DecodeResult * DR;
         IRPBINDecoder_Input * IN;
+        uint64_t p;
+        uint64_t n;
 } IRPBinDecoderContext;
 
-IRPBinDecoderContext * IRPBinDecoderContext_allocate(char const * fn);
+IRPBinDecoderContext * IRPBinDecoderContext_allocate(char const * fn, uint64_t const rn);
 IRPBinDecoderContext * IRPBinDecoderContext_deallocate(IRPBinDecoderContext * I);
 int IRPBinDecoderContext_printPair(IRPBinDecoderContext const * I, FILE * out);
 #endif

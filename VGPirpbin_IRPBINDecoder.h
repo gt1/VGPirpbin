@@ -41,13 +41,59 @@ typedef struct _IRPBINDecoder
 	uint64_t datapos;
 } IRPBINDecoder;
 
-IRPBINDecoder * IRPBINDecoder_deallocate(IRPBINDecoder * I);
-IRPBINDecoder * IRPBINDecoder_allocate();
+/**
+ * allocate decoder for binary IRP files
+ **/
 IRPBINDecoder * IRPBINDecoder_allocateFromFile(char const * fn, char const * binfiletype);
-void IRPBINDecoder_addStep(IRPBINDecoder * I, ProvenanceStep ** insPS);
+/**
+ * print header of binary IRP file as text
+ *
+ * return codes:
+ *  -1: failure
+ *   0: success
+ *
+ **/
 int IRPBINDecoder_printHeader(IRPBINDecoder const * I, FILE * out);
+/**
+ * decode a pair from the current position and store the information in context
+ *
+ * return codes:
+ *  * -1: an error occurred
+ *  *  0: end of file reached
+ *  *  1: succesfully decoded a read pair
+ *  *  2: found a read group record and stored it in context
+ *
+ **/
 int IRPBINDecoder_decodePair(IRPBINDecoder * I, IRPBinDecoderContext * context);
-/* int IRPBINDecoder_skipPair(IRPBINDecoder * I); */
+/**
+ * set input pointer to position i
+ *
+ * return codes:
+ *  * -1: seek failed
+ *  *  0: seek successful
+ *
+ **/
 int IRPBINDecoder_seek(IRPBINDecoder * I, IRPBinDecoderContext * context, uint64_t i);
+/**
+ * get a context for decoding records and set the input pointer for that context to record 0
+ * After use the context should be freed using IRPBinDecoderContext_deallocate
+ *
+ * return values:
+ *  * NULL: failed to construct context
+ *  * any other value: pointer to decode context
+ **/
 IRPBinDecoderContext * IRPBINDecoder_getContext(IRPBINDecoder * I);
+
+/**
+ * deallocate a decoder object
+ *
+ * return values:
+ *   NULL: always
+ **/
+IRPBINDecoder * IRPBINDecoder_deallocate(IRPBINDecoder * I);
+
+/**
+ * add provenance step line to the header
+ **/
+void IRPBINDecoder_addStep(IRPBINDecoder * I, ProvenanceStep ** insPS);
 #endif

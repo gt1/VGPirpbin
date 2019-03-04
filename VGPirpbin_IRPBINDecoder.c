@@ -22,6 +22,52 @@
 #include <assert.h>
 #include <limits.h>
 
+static IRPBINDecoder * IRPBINDecoder_allocate()
+{
+	IRPBINDecoder * I = NULL;
+
+	I = (IRPBINDecoder *)malloc(sizeof(IRPBINDecoder));
+
+	if ( ! I )
+		return IRPBINDecoder_deallocate(I);
+
+	memset(I,0,sizeof(IRPBINDecoder));
+
+	#if 0
+	if ( !(I->DF = DecodeResult_allocate()) )
+		return IRPBINDecoder_deallocate(I);
+
+	if ( !(I->DR = DecodeResult_allocate()) )
+		return IRPBINDecoder_deallocate(I);
+	#endif
+
+	return I;
+}
+
+
+void IRPBINDecoder_addStep(IRPBINDecoder * I, ProvenanceStep ** insPS)
+{
+	uint64_t ii;
+
+	assert ( I->PS );
+
+	{
+		ProvenanceStep * PP = I->PS;
+		assert ( PP );
+
+		while ( PP->next )
+			PP = PP->next;
+
+		PP->next = *insPS;
+		*insPS = NULL;
+	}
+
+	for ( ii = 0; ii < I->HSLo; ++ii )
+		if ( I->HSL[ii].type == '#' && I->HSL[ii].subtype == '!' )
+			I->HSL[ii].num += 1;
+}
+
+
 static int IRPBINDecoder_decodeSequenceAndQuality(
 	BitLevelDecoder * BLD,
 	QualityHuffman * QH,
@@ -464,27 +510,6 @@ IRPBINDecoder * IRPBINDecoder_deallocate(IRPBINDecoder * I)
 }
 
 
-IRPBINDecoder * IRPBINDecoder_allocate()
-{
-	IRPBINDecoder * I = NULL;
-
-	I = (IRPBINDecoder *)malloc(sizeof(IRPBINDecoder));
-
-	if ( ! I )
-		return IRPBINDecoder_deallocate(I);
-
-	memset(I,0,sizeof(IRPBINDecoder));
-
-	#if 0
-	if ( !(I->DF = DecodeResult_allocate()) )
-		return IRPBINDecoder_deallocate(I);
-
-	if ( !(I->DR = DecodeResult_allocate()) )
-		return IRPBINDecoder_deallocate(I);
-	#endif
-
-	return I;
-}
 
 
 IRPBINDecoder * IRPBINDecoder_allocateFromFile(char const * fn, char const * binfiletype)
@@ -691,27 +716,6 @@ IRPBINDecoder * IRPBINDecoder_allocateFromFile(char const * fn, char const * bin
 	return NULL;
 }
 
-void IRPBINDecoder_addStep(IRPBINDecoder * I, ProvenanceStep ** insPS)
-{
-	uint64_t ii;
-
-	assert ( I->PS );
-
-	{
-		ProvenanceStep * PP = I->PS;
-		assert ( PP );
-
-		while ( PP->next )
-			PP = PP->next;
-
-		PP->next = *insPS;
-		*insPS = NULL;
-	}
-
-	for ( ii = 0; ii < I->HSLo; ++ii )
-		if ( I->HSL[ii].type == '#' && I->HSL[ii].subtype == '!' )
-			I->HSL[ii].num += 1;
-}
 
 int IRPBINDecoder_printHeader(IRPBINDecoder const * I, FILE * out)
 {
@@ -736,6 +740,11 @@ int IRPBINDecoder_printHeader(IRPBINDecoder const * I, FILE * out)
 int IRPBINDecoder_decodePair(IRPBINDecoder * I, IRPBinDecoderContext * context)
 {
 	int64_t llv;
+
+	/* EOF? */
+	if ( context->p == context->n )
+		return 0;
+
 	if ( (llv = HuffmanCode_decodeSymbol(I->symCode, context->IN->BLD)) < 0 )
 	{
 		fprintf(stderr,"[E] unable to read marker\n");
@@ -772,7 +781,7 @@ int IRPBINDecoder_decodePair(IRPBINDecoder * I, IRPBinDecoderContext * context)
 
 			/* free(groupname); */
 
-			return 1;
+			return 2;
 		}
 		default:
 		{
@@ -794,73 +803,10 @@ int IRPBINDecoder_decodePair(IRPBINDecoder * I, IRPBinDecoderContext * context)
 		return -1;
 	}
 
-	return 0;
+	context->p += 1;
+
+	return 1;
 }
-
-#if 0
-int IRPBINDecoder_skipPair(IRPBINDecoder * I)
-{
-	int64_t llv;
-	if ( (llv = HuffmanCode_decodeSymbol(I->symCode, I->BLD)) < 0 )
-	{
-		fprintf(stderr,"[E] unable to read marker\n");
-		return -1;
-	}
-
-	switch ( llv )
-	{
-		case 'P':
-		{
-			break;
-		}
-		case 'g':
-		{
-			uint64_t groupsize;
-			char * groupname = NULL;
-
-			if ( BitLevelDecoder_decodeGamma(I->BLD,&groupsize) < 0 )
-			{
-				fprintf(stderr,"[E] failed to read group size after g marker\n");
-				return -1;
-			}
-
-			if ( ! (groupname = BitLevelDecoder_decodeString(I->BLD)) )
-			{
-				fprintf(stderr,"[E] failed to read group name after g marker\n");
-				return -1;
-			}
-
-			/* fprintf(stderr,"[V] found group %s of size %lu\n", groupname, (unsigned long)groupsize); */
-
-			free(groupname);
-
-			/* free(groupname); */
-
-			return 1;
-		}
-		default:
-		{
-			fprintf(stderr,"[E] unknown marker %c\n", (char)llv);
-			return -1;
-			break;
-		}
-	}
-
-	if ( IRPBINDecoder_skipSequenceAndQuality(I->BLD,I->QH,I->symCode,I->lengthsCode) < 0 )
-	{
-		fprintf(stderr,"[E] unable to read forward data\n");
-		return -1;
-	}
-
-	if ( IRPBINDecoder_skipSequenceAndQuality(I->BLD,I->QH,I->symCode,I->lengthsCode) < 0 )
-	{
-		fprintf(stderr,"[E] unable to read reverse data\n");
-		return -1;
-	}
-
-	return 0;
-}
-#endif
 
 int IRPBINDecoder_seek(IRPBINDecoder * I, IRPBinDecoderContext * context, uint64_t i)
 {
@@ -890,10 +836,23 @@ int IRPBINDecoder_seek(IRPBINDecoder * I, IRPBinDecoderContext * context, uint64
 		int const r = IRPBINDecoder_decodePair(I,context);
 
 		if ( r < 0 )
+		{
 			return -1;
+		}
 		else if ( r == 0 )
+		{
+			break;
+		}
+		else if ( r == 1 )
+		{
 			blockmod -= 1;
+		}
+		else
+		{
+		}
 	}
+
+	context->p = i;
 
 	return 0;
 }
@@ -902,7 +861,7 @@ IRPBinDecoderContext * IRPBINDecoder_getContext(IRPBINDecoder * I)
 {
 	IRPBinDecoderContext * context = NULL;
 
-	if (!(context = IRPBinDecoderContext_allocate(I->fn)))
+	if (!(context = IRPBinDecoderContext_allocate(I->fn,I->nr)))
 		goto cleanup;
 
 	if ( BitLevelDecoder_seek(context->IN->BLD,I->datapos) < 0 )
