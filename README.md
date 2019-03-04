@@ -150,7 +150,7 @@ Assuming the code is saved as IRPtoFastA.c, the program can be compiled
 using
 
 ```
-cc -I${HOME}/vgp/include test.c -o test -L${HOME}/vgp/lib -lVGPirpbin
+cc -I${HOME}/vgp/include IRPtoFastA.c -o IRPtoFastA -L${HOME}/vgp/lib -lVGPirpbin
 ```
 
 if VGPirpbin has previously been installed at ${HOME}/vgp (using
