@@ -19,3 +19,13 @@ Convert binary IRP to text
 ```
 VGPirpbin b2a reads.bsq > reads.irp
 ```
+
+The binary to text conversion supports ranges via the --from and --to
+switches, e.g.:
+
+```
+VGPirpbin b2a --from50 --to100 reads.bsq > reads.irp
+```
+
+Note that not converting the whole binary file to text form will produce a
+file without a header.

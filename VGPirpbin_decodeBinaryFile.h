@@ -20,5 +20,5 @@
 #include "VGPirpbin_pre.h"
 #include "VGPirpbin_IRPBINDecoder.h"
 
-int VGP_IRPBIN_decodeBinaryFile(char const * fn, ProvenanceStep ** insPS);
+int VGP_IRPBIN_decodeBinaryFile(char const * fn, ProvenanceStep ** insPS, int64_t from, int64_t to);
 #endif

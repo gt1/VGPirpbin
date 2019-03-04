@@ -32,6 +32,8 @@ int main(int argc, char * argv[])
 	char const * outfn;
 	char const * command;
 	int64_t maxstatlines = INT64_MAX;
+	int64_t from = 0;
+	int64_t to = INT64_MAX;
 	ProvenanceStep * PS = NULL;
 	Arguments * A = NULL;
 	int returncode = EXIT_SUCCESS;
@@ -100,7 +102,12 @@ int main(int argc, char * argv[])
 
 		infn = A->posArgs[1];
 
-		if ( VGP_IRPBIN_decodeBinaryFile(infn,&PS) < 0 )
+		from = Arguments_haveNonPosInteger(A,"--from") ? Arguments_getNonPosInteger(A,"--from",-1) : 0;
+		to = Arguments_haveNonPosInteger(A,"--to") ? Arguments_getNonPosInteger(A,"--to",-1) : INT64_MAX;
+
+		fprintf(stderr,"[V] from=%ld to=%ld\n", (long)from, (long)to);
+
+		if ( VGP_IRPBIN_decodeBinaryFile(infn,&PS,from,to) < 0 )
 		{
 			fprintf(stderr,"[E] failed to check binary file\n");
 			returncode = EXIT_FAILURE;

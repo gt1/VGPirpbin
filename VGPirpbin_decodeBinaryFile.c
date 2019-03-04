@@ -20,16 +20,20 @@
 #include <stdlib.h>
 #include <string.h>
 
-int VGP_IRPBIN_decodeBinaryFile(char const * fn, ProvenanceStep ** insPS)
+int VGP_IRPBIN_decodeBinaryFile(char const * fn, ProvenanceStep ** insPS, int64_t from, int64_t to)
 {
 	int returncode = 0;
 	uint64_t iii = 0;
 	uint64_t s = 0;
+	uint64_t todo = 0;
 	int done = 0;
 	time_t t;
 	time_t t0;
 	IRPBINDecoder * I = NULL;
 	IRPBinDecoderContext * context = NULL;
+
+	if ( from < 0 )
+		from = 0;
 
 	if ( ! (I = IRPBINDecoder_allocateFromFile(fn)) )
 	{
@@ -37,12 +41,24 @@ int VGP_IRPBIN_decodeBinaryFile(char const * fn, ProvenanceStep ** insPS)
 		goto cleanup;
 	}
 
+	if ( to > (int64_t)I->nr )
+		to = I->nr;
+
+	if ( from > to )
+	{
+		from = 0;
+		to = 0;
+	}
+
 	IRPBINDecoder_addStep(I,insPS);
 
-	if ( IRPBINDecoder_printHeader(I,stdout) < 0 )
+	if ( from == 0 && to == (int64_t)I->nr )
 	{
-		returncode = -1;
-		goto cleanup;
+		if ( IRPBINDecoder_printHeader(I,stdout) < 0 )
+		{
+			returncode = -1;
+			goto cleanup;
+		}
 	}
 
 	if (!(context = IRPBINDecoder_getContext(I)))
@@ -51,9 +67,20 @@ int VGP_IRPBIN_decodeBinaryFile(char const * fn, ProvenanceStep ** insPS)
 		goto cleanup;
 	}
 
+	if ( from != 0 )
+	{
+		if ( IRPBINDecoder_seek(I,context,from) < 0 )
+		{
+			returncode = -1;
+			goto cleanup;
+		}
+	}
+
+	todo = to - from;
+
 	t = time(NULL);
 	t0 = t;
-	while ( !done )
+	while ( !done && todo )
 	{
 		int r0;
 
@@ -92,6 +119,8 @@ int VGP_IRPBIN_decodeBinaryFile(char const * fn, ProvenanceStep ** insPS)
 			s += context->DR->Q_o;
 
 			iii += 1;
+			todo -= 1;
+
 			if ( iii % (1024*1024)  == 0 )
 			{
 				time_t const tn = time(NULL);
