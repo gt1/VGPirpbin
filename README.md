@@ -30,7 +30,7 @@ VGPirpbin b2a --from50 --to100 reads.bsq > reads.irp
 Note that not converting the whole binary file to text form will produce a
 file without a header.
 
-# building:
+## building
 
 The VGPirpbin comes with a Makefile which will build the VGPirpbin and an
 accompanying library for accessing binary IRP files from C programs. For
