@@ -1,7 +1,7 @@
 # VGPirpbin
 Text to binary and binary to text converter for the IRP file format
 
-# usage:
+## usage
 
 Convert IRP text to binary
 
@@ -29,3 +29,29 @@ VGPirpbin b2a --from50 --to100 reads.bsq > reads.irp
 
 Note that not converting the whole binary file to text form will produce a
 file without a header.
+
+# building:
+
+The VGPirpbin comes with a Makefile which will build the VGPirpbin and an
+accompanying library for accessing binary IRP files from C programs. For
+building those just run make. The C compiler used can be set via the CC
+variable, e.g.
+
+```
+CC=gcc make
+```
+
+## installation
+
+The package can be installed via
+
+```
+make install
+```
+
+The default installation path is /usr/local. This can be changed using the
+PREFIX variable when calling make install:
+
+```
+PREFIX=${HOME}/vgp make install
+```
