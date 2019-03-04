@@ -58,7 +58,8 @@ PREFIX=${HOME}/vgp make install
 
 ## using the library in C code
 
-Here is a short example for accessing binary IRP files from C code
+Here is a short example for accessing binary IRP files from C code. The code
+reads a binary IRP file and outputs the records in FastA format.
 
 ```
 #include "VGPirpbin_decodeBinaryFile.h"
@@ -144,3 +145,13 @@ int main(int argc, char * argv[])
 	return returncode;
 }
 ```
+
+Assuming the code is saved as IRPtoFastA.c, the program can be compiled
+using
+
+```
+cc -I${HOME}/vgp/include test.c -o test -L${HOME}/vgp/lib -lVGPirpbin
+```
+
+if VGPirpbin has previously been installed at ${HOME}/vgp (using
+`PREFIX=$HOME/vgp make install`).
