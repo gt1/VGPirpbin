@@ -116,7 +116,7 @@ static int IRPBINDecoder_decodeSequenceAndQuality(
 		}
 	}
 
-	while ( seqlen > D->S_o )
+	while ( !((seqlen+1) <= D->S_o) )
 	{
 		size_t nlen = D->S_o ? 2 * D->S_o : 1;
 		free(D->S);
@@ -159,6 +159,7 @@ static int IRPBINDecoder_decodeSequenceAndQuality(
 		D->S[i] = sym;
 	}
 
+	D->S[seqlen] = 0;
 	D->S_l = seqlen;
 
 	/* fprintf(stderr,"\n"); */
@@ -191,8 +192,7 @@ static int IRPBINDecoder_decodeSequenceAndQuality(
 		}
 	}
 
-
-	while ( qlen > D->Q_o )
+	while ( !((qlen+1) <= D->Q_o) )
 	{
 		size_t nlen = D->Q_o ? 2 * D->Q_o : 1;
 		free(D->Q);
@@ -290,6 +290,7 @@ static int IRPBINDecoder_decodeSequenceAndQuality(
 
 	/* fprintf(stderr,"\n"); */
 
+	D->Q[qlen] = 0;
 	D->Q_l = qlen;
 
 	cleanup:
