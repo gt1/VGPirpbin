@@ -27,9 +27,8 @@ int VGP_IRPBIN_decodeBinaryFile(char const * fn, ProvenanceStep ** insPS, char c
 	uint64_t s = 0;
 	time_t t;
 	time_t t0;
-	IRPBinDecoderContext * context = NULL;
-
 	IRPBINDecoder * I = NULL;
+	IRPBinDecoderContext * context = NULL;
 
 	if ( ! (I = IRPBINDecoder_allocateFromFile(fn,binfiletype)) )
 	{
@@ -39,19 +38,17 @@ int VGP_IRPBIN_decodeBinaryFile(char const * fn, ProvenanceStep ** insPS, char c
 
 	IRPBINDecoder_addStep(I,insPS);
 
-	if (!(context = IRPBinDecoderContext_allocate()))
-	{
-		returncode = -1;
-		goto cleanup;
-	}
-
 	if ( IRPBINDecoder_printHeader(I,stdout) < 0 )
 	{
 		returncode = -1;
 		goto cleanup;
 	}
 
-	/* IRPBINDecoder_seek(I,0); */
+	if (!(context = IRPBINDecoder_getContext(I)))
+	{
+		returncode = -1;
+		goto cleanup;
+	}
 
 	t = time(NULL);
 	t0 = t;

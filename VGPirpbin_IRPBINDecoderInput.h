@@ -14,27 +14,19 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 **/
-#if ! defined(VGPIRPBIN_BITLEVELDECODER_H)
-#define VGPIRPBIN_BITLEVELDECODER_H
+#if ! defined(VGPIRPBIN_IRPBINDECODER_INPUT_H)
+#define VGPIRPBIN_IRPBINDECODER_INPUT_H
 
 #include "VGPirpbin_pre.h"
-#include <stdint.h>
 #include <stdio.h>
+#include "VGPirpbin_BitLevelDecoder.h"
 
-typedef struct _BitLevelDecoder
+typedef struct _IRPBINDecoder_Input
 {
 	FILE * in;
-	uint8_t c;
-	unsigned int f;
-} BitLevelDecoder;
+	BitLevelDecoder * BLD;
+} IRPBINDecoder_Input;
 
-BitLevelDecoder * BitLevelDecoder_allocate(FILE * in);
-int BitLevelDecoder_load(BitLevelDecoder * BLV);
-int BitLevelDecoder_getBit(BitLevelDecoder * BLV);
-int BitLevelDecoder_decodeGamma(BitLevelDecoder * BLV, uint64_t * v);
-void BitLevelDecoder_deallocate(BitLevelDecoder * BLV);
-int BitLevelDecoder_decode(BitLevelDecoder * BLV, uint64_t * v, unsigned int l);
-char * BitLevelDecoder_decodeString(BitLevelDecoder * BLD);
-int BitLevelDecoder_seek(BitLevelDecoder * BLD, uint64_t const p);
-int BitLevelDecoder_tell(BitLevelDecoder * BLV, uint64_t * p);
+IRPBINDecoder_Input * IRPBINDecoder_Input_allocate(char const * fn);
+IRPBINDecoder_Input * IRPBINDecoder_Input_deallocate(IRPBINDecoder_Input * I);
 #endif

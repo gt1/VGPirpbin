@@ -15,12 +15,14 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 **/
 #include "VGPirpbin_IRPBINDecoder.h"
+#include "VGPirpbin_IRPBINDecoderInput.h"
+#include "VGPirpbin_mstrdup.h"
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
 #include <limits.h>
 
-int IRPBINDecoder_decodeSequenceAndQuality(
+static int IRPBINDecoder_decodeSequenceAndQuality(
 	BitLevelDecoder * BLD,
 	QualityHuffman * QH,
 	HuffmanCode * symCode,
@@ -248,7 +250,8 @@ int IRPBINDecoder_decodeSequenceAndQuality(
 	return returncode;
 }
 
-int IRPBINDecoder_skipSequenceAndQuality(
+#if 0
+static int IRPBINDecoder_skipSequenceAndQuality(
 	BitLevelDecoder * BLD,
 	QualityHuffman * QH,
 	HuffmanCode * symCode,
@@ -431,15 +434,19 @@ int IRPBINDecoder_skipSequenceAndQuality(
 
 	return returncode;
 }
+#endif
 
 IRPBINDecoder * IRPBINDecoder_deallocate(IRPBINDecoder * I)
 {
 	if ( I )
 	{
+		#if 0
 		if ( I->in )
 			fclose(I->in);
-		QualityHuffman_deallocate(I->QH);
 		BitLevelDecoder_deallocate(I->BLD);
+		#endif
+
+		QualityHuffman_deallocate(I->QH);
 		#if 0
 		DecodeResult_deallocate(I->DF);
 		DecodeResult_deallocate(I->DR);
@@ -449,6 +456,7 @@ IRPBINDecoder * IRPBINDecoder_deallocate(IRPBINDecoder * I)
 		ProvenanceStep_deallocate(I->PS);
 		HuffmanCode_deallocate(I->symCode);
 		HuffmanCode_deallocate(I->lengthsCode);
+		free(I->fn);
 		free(I);
 	}
 
@@ -478,12 +486,14 @@ IRPBINDecoder * IRPBINDecoder_allocate()
 	return I;
 }
 
+
 IRPBINDecoder * IRPBINDecoder_allocateFromFile(char const * fn, char const * binfiletype)
 {
 	IRPBINDecoder * I = NULL;
 	uint64_t iii = 0;
 	uint64_t ii = 0;
 	char const * cc = NULL;
+	IRPBINDecoder_Input * IN = NULL;
 
 	if ( !(I = IRPBINDecoder_allocate()) )
 	{
@@ -491,22 +501,34 @@ IRPBINDecoder * IRPBINDecoder_allocateFromFile(char const * fn, char const * bin
 		goto cleanup;
 	}
 
+	if ( ! (I->fn = mstrdup(fn)) )
+	{
+		fprintf(stderr,"[E] failed to allocate memory\n");
+		goto cleanup;
+	}
 
-
-	if ( ! (I->in = fopen(fn,"rb")) )
+	if ( ! (IN = IRPBINDecoder_Input_allocate(I->fn)) )
 	{
 		fprintf(stderr,"[E] failed to open file %s\n",fn);
 		goto cleanup;
 	}
 
+	#if 0
+	if ( ! (I->in = fopen(fn,"rb")) )
+	{
+		fprintf(stderr,"[E] failed to open file %s\n",fn);
+		goto cleanup;
+	}
+	#endif
+
 	/* read position of index */
-	FSEEK(I->in,-(int)sizeof(uint64_t),SEEK_END);
+	FSEEK(IN->in,-(int)sizeof(uint64_t),SEEK_END);
 
 	I->indexpos = 0;
 	for ( iii = 0; iii < sizeof(uint64_t); ++iii )
 	{
 		unsigned char c;
-		if ( fread(&c,1,1,I->in) != 1 )
+		if ( fread(&c,1,1,IN->in) != 1 )
 		{
 			fprintf(stderr,"[E] failed to read position of index %s\n",fn);
 			goto cleanup;
@@ -520,13 +542,15 @@ IRPBINDecoder * IRPBINDecoder_allocateFromFile(char const * fn, char const * bin
 	fprintf(stderr,"index position at %lu\n", (unsigned long)indexpos);
 	#endif
 
-	FSEEK(I->in,0,SEEK_SET);
+	FSEEK(IN->in,0,SEEK_SET);
 
+	#if 0
 	if ( ! (I->BLD = BitLevelDecoder_allocate(I->in)) )
 	{
 		fprintf(stderr,"[E] failed to instantiate bit level decoder for %s\n",fn);
 		goto cleanup;
 	}
+	#endif
 
 	/* read file type */
 	for ( cc = binfiletype; *cc; ++cc )
@@ -534,7 +558,7 @@ IRPBINDecoder * IRPBINDecoder_allocateFromFile(char const * fn, char const * bin
 		uint64_t v;
 		int c;
 
-		if ( BitLevelDecoder_decode(I->BLD,&v,8) < 0 )
+		if ( BitLevelDecoder_decode(IN->BLD,&v,8) < 0 )
 		{
 			fprintf(stderr,"[E] failed to read number of reads in file\n");
 			goto cleanup;
@@ -550,14 +574,14 @@ IRPBINDecoder * IRPBINDecoder_allocateFromFile(char const * fn, char const * bin
 	}
 
 	/* read number of pairs in file */
-	if ( BitLevelDecoder_decode(I->BLD,&(I->nr),64) < 0 )
+	if ( BitLevelDecoder_decode(IN->BLD,&(I->nr),64) < 0 )
 	{
 		fprintf(stderr,"[E] failed to read number of reads in file\n");
 		goto cleanup;
 	}
 
 	/* read size of HeaderStatsLine table */
-	if ( BitLevelDecoder_decode(I->BLD,&(I->HSLo),64) < 0 )
+	if ( BitLevelDecoder_decode(IN->BLD,&(I->HSLo),64) < 0 )
 	{
 		fprintf(stderr,"[E] failed to read number of header objects in file\n");
 		goto cleanup;
@@ -572,14 +596,14 @@ IRPBINDecoder * IRPBINDecoder_allocateFromFile(char const * fn, char const * bin
 
 	/* read HeaderStatsLine table */
 	for ( ii = 0; ii < I->HSLo; ++ii )
-		if ( HeaderStatsLine_decode(I->BLD,&(I->HSL[ii])) < 0 )
+		if ( HeaderStatsLine_decode(IN->BLD,&(I->HSL[ii])) < 0 )
 		{
 			fprintf(stderr,"[E] unable to read header objects\n");
 			goto cleanup;
 		}
 
 	/* decode provenance lines */
-	if ( !(I->PS = ProvenanceStep_decode(I->BLD)) )
+	if ( !(I->PS = ProvenanceStep_decode(IN->BLD)) )
 	{
 		fprintf(stderr,"[E] unable to decode provenance\n");
 		goto cleanup;
@@ -587,14 +611,14 @@ IRPBINDecoder * IRPBINDecoder_allocateFromFile(char const * fn, char const * bin
 
 
 	/* read index mod */
-	if ( BitLevelDecoder_decode(I->BLD,&(I->indexmod),64) < 0 )
+	if ( BitLevelDecoder_decode(IN->BLD,&(I->indexmod),64) < 0 )
 	{
 		fprintf(stderr,"[E] failed to indexmod from file\n");
 		goto cleanup;
 	}
 
 	/* read huffman tables  */
-	if ( ! (I->QH = QualityHuffman_decode(I->BLD)) )
+	if ( ! (I->QH = QualityHuffman_decode(IN->BLD)) )
 	{
 		fprintf(stderr,"[E] failed to decode Huffman tables in %s\n",fn);
 		goto cleanup;
@@ -610,7 +634,7 @@ IRPBINDecoder * IRPBINDecoder_allocateFromFile(char const * fn, char const * bin
 	#endif
 
 	/* read size of reverse quality table */
-	if ( BitLevelDecoder_decodeGamma(I->BLD,&(I->reverseQualityTableSize)) < 0 )
+	if ( BitLevelDecoder_decodeGamma(IN->BLD,&(I->reverseQualityTableSize)) < 0 )
 	{
 		fprintf(stderr,"[E] unable to decode size of reverse quality table from %s\n",fn);
 		goto cleanup;
@@ -625,19 +649,19 @@ IRPBINDecoder * IRPBINDecoder_allocateFromFile(char const * fn, char const * bin
 
 	/* decode reverse quality table */
 	for ( ii = 0; ii < I->reverseQualityTableSize; ++ii )
-		if ( BitLevelDecoder_decodeGamma(I->BLD,&(I->reverseQualityTable[ii])) < 0 )
+		if ( BitLevelDecoder_decodeGamma(IN->BLD,&(I->reverseQualityTable[ii])) < 0 )
 		{
 			fprintf(stderr,"[E] unable to decode reverse quality table from %s\n",fn);
 			goto cleanup;
 		}
 
-	if ( ! (I->symCode = HuffmanCode_decode(I->BLD)) )
+	if ( ! (I->symCode = HuffmanCode_decode(IN->BLD)) )
 	{
 		fprintf(stderr,"[E] unable to decode sym huffman table from %s\n",fn);
 		goto cleanup;
 	}
 
-	if ( ! (I->lengthsCode = HuffmanCode_decode(I->BLD)) )
+	if ( ! (I->lengthsCode = HuffmanCode_decode(IN->BLD)) )
 	{
 		fprintf(stderr,"[E] unable to decode sym huffman table from %s\n",fn);
 		goto cleanup;
@@ -648,10 +672,23 @@ IRPBINDecoder * IRPBINDecoder_allocateFromFile(char const * fn, char const * bin
 	fprintf(stderr,"[V] lengths huffman table\n");
 	CodeTable_print(stderr,I->lengthsCode->CT);
 
+	if ( BitLevelDecoder_tell(IN->BLD,&(I->datapos)) < 0 )
+	{
+		fprintf(stderr,"[E] unable to get position after header in %s\n",fn);
+		goto cleanup;
+	}
+
+	/* fprintf(stderr,"[V] offset %lu\n", (unsigned long)(I->datapos)); */
+
+	IRPBINDecoder_Input_deallocate(IN);
+
 	return I;
 
 	cleanup:
-	return IRPBINDecoder_deallocate(I);
+	IRPBINDecoder_Input_deallocate(IN);
+	IRPBINDecoder_deallocate(I);
+
+	return NULL;
 }
 
 void IRPBINDecoder_addStep(IRPBINDecoder * I, ProvenanceStep ** insPS)
@@ -696,10 +733,10 @@ int IRPBINDecoder_printHeader(IRPBINDecoder const * I, FILE * out)
 	return returncode;
 }
 
-int IRPBINDecoder_decodePair(IRPBINDecoder * I,  IRPBinDecoderContext * context)
+int IRPBINDecoder_decodePair(IRPBINDecoder * I, IRPBinDecoderContext * context)
 {
 	int64_t llv;
-	if ( (llv = HuffmanCode_decodeSymbol(I->symCode, I->BLD)) < 0 )
+	if ( (llv = HuffmanCode_decodeSymbol(I->symCode, context->IN->BLD)) < 0 )
 	{
 		fprintf(stderr,"[E] unable to read marker\n");
 		return -1;
@@ -716,13 +753,13 @@ int IRPBINDecoder_decodePair(IRPBINDecoder * I,  IRPBinDecoderContext * context)
 			uint64_t groupsize;
 			char * groupname = NULL;
 
-			if ( BitLevelDecoder_decodeGamma(I->BLD,&groupsize) < 0 )
+			if ( BitLevelDecoder_decodeGamma(context->IN->BLD,&groupsize) < 0 )
 			{
 				fprintf(stderr,"[E] failed to read group size after g marker\n");
 				return -1;
 			}
 
-			if ( ! (groupname = BitLevelDecoder_decodeString(I->BLD)) )
+			if ( ! (groupname = BitLevelDecoder_decodeString(context->IN->BLD)) )
 			{
 				fprintf(stderr,"[E] failed to read group name after g marker\n");
 				return -1;
@@ -745,13 +782,13 @@ int IRPBINDecoder_decodePair(IRPBINDecoder * I,  IRPBinDecoderContext * context)
 		}
 	}
 
-	if ( IRPBINDecoder_decodeSequenceAndQuality(I->BLD,I->QH,I->symCode,I->lengthsCode,I->reverseQualityTable,context->DF) < 0 )
+	if ( IRPBINDecoder_decodeSequenceAndQuality(context->IN->BLD,I->QH,I->symCode,I->lengthsCode,I->reverseQualityTable,context->DF) < 0 )
 	{
 		fprintf(stderr,"[E] unable to read forward data\n");
 		return -1;
 	}
 
-	if ( IRPBINDecoder_decodeSequenceAndQuality(I->BLD,I->QH,I->symCode,I->lengthsCode,I->reverseQualityTable,context->DR) < 0 )
+	if ( IRPBINDecoder_decodeSequenceAndQuality(context->IN->BLD,I->QH,I->symCode,I->lengthsCode,I->reverseQualityTable,context->DR) < 0 )
 	{
 		fprintf(stderr,"[E] unable to read reverse data\n");
 		return -1;
@@ -760,6 +797,7 @@ int IRPBINDecoder_decodePair(IRPBINDecoder * I,  IRPBinDecoderContext * context)
 	return 0;
 }
 
+#if 0
 int IRPBINDecoder_skipPair(IRPBINDecoder * I)
 {
 	int64_t llv;
@@ -822,8 +860,9 @@ int IRPBINDecoder_skipPair(IRPBINDecoder * I)
 
 	return 0;
 }
+#endif
 
-int IRPBINDecoder_seek(IRPBINDecoder * I, uint64_t i)
+int IRPBINDecoder_seek(IRPBINDecoder * I, IRPBinDecoderContext * context, uint64_t i)
 {
 	uint64_t blockid;
 	uint64_t blockmod;
@@ -835,20 +874,20 @@ int IRPBINDecoder_seek(IRPBINDecoder * I, uint64_t i)
 	blockid = i / I->indexmod;
 	blockmod = i - (blockid * I->indexmod);
 
-	if ( BitLevelDecoder_seek(I->BLD,I->indexpos + blockid * CHAR_BIT * sizeof(uint64_t)) < 0 )
+	if ( BitLevelDecoder_seek(context->IN->BLD,I->indexpos + blockid * CHAR_BIT * sizeof(uint64_t)) < 0 )
 		return -1;
 
-	if ( BitLevelDecoder_decode(I->BLD,&filepos,64) < 0 )
+	if ( BitLevelDecoder_decode(context->IN->BLD,&filepos,64) < 0 )
 		return -1;
 
-	fprintf(stderr,"file position is %lu\n", (unsigned long)filepos);
+	/* fprintf(stderr,"file position is %lu\n", (unsigned long)filepos); */
 
-	if ( BitLevelDecoder_seek(I->BLD,filepos) < 0 )
+	if ( BitLevelDecoder_seek(context->IN->BLD,filepos) < 0 )
 		return -1;
 
 	while ( blockmod )
 	{
-		int const r = IRPBINDecoder_skipPair(I);
+		int const r = IRPBINDecoder_decodePair(I,context);
 
 		if ( r < 0 )
 			return -1;
@@ -857,4 +896,20 @@ int IRPBINDecoder_seek(IRPBINDecoder * I, uint64_t i)
 	}
 
 	return 0;
+}
+
+IRPBinDecoderContext * IRPBINDecoder_getContext(IRPBINDecoder * I)
+{
+	IRPBinDecoderContext * context = NULL;
+
+	if (!(context = IRPBinDecoderContext_allocate(I->fn)))
+		goto cleanup;
+
+	if ( BitLevelDecoder_seek(context->IN->BLD,I->datapos) < 0 )
+		goto cleanup;
+
+	return context;
+
+	cleanup:
+	return IRPBinDecoderContext_deallocate(context);
 }

@@ -5,7 +5,7 @@ SOURCE=VGPirpbin_LineBuffer.c VGPirpbin_mstrdup.c VGPirpbin_expect.c VGPirpbin_g
 	VGPirpbin_mconcat.c VGPirpbin_ProvenanceStep.c VGPirpbin_HeaderStatsLine.c \
 	VGPirpbin_DecodeResult.c VGPirpbin_IRPBINDecoder.c VGPirpbin_getQualityTable.c \
 	VGPirpbin_getQualityCode.c VGPirpbin_produceBinary.c VGPirpbin_Arguments.c \
-	VGPirpbin_decodeBinaryFile.c VGPirpbin_IRPBinDecoderContext.c
+	VGPirpbin_decodeBinaryFile.c VGPirpbin_IRPBinDecoderContext.c VGPirpbin_IRPBINDecoderInput.c
 
 VGPirpbin: ${SOURCE} VGPirpbin_main.c
 	${CC} -ansi -pedantic -W -Wall -O3 -g ${SOURCE} VGPirpbin_main.c -o VGPirpbin

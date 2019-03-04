@@ -26,9 +26,8 @@
 
 typedef struct _IRPBINDecoder
 {
-	FILE * in;
+	char * fn;
 	QualityHuffman * QH;
-	BitLevelDecoder * BLD;
 	uint64_t reverseQualityTableSize;
 	uint64_t * reverseQualityTable;
 	uint64_t HSLo;
@@ -39,28 +38,16 @@ typedef struct _IRPBINDecoder
 	uint64_t nr;
 	uint64_t indexmod;
 	uint64_t indexpos;
+	uint64_t datapos;
 } IRPBINDecoder;
 
-int IRPBINDecoder_decodeSequenceAndQuality(
-	BitLevelDecoder * BLD,
-	QualityHuffman * QH,
-	HuffmanCode * symCode,
-	HuffmanCode * lengthsCode,
-	uint64_t * reverseQualityTable,
-	DecodeResult * D
-);
-int IRPBINDecoder_skipSequenceAndQuality(
-	BitLevelDecoder * BLD,
-	QualityHuffman * QH,
-	HuffmanCode * symCode,
-	HuffmanCode * lengthsCode
-);
 IRPBINDecoder * IRPBINDecoder_deallocate(IRPBINDecoder * I);
 IRPBINDecoder * IRPBINDecoder_allocate();
 IRPBINDecoder * IRPBINDecoder_allocateFromFile(char const * fn, char const * binfiletype);
 void IRPBINDecoder_addStep(IRPBINDecoder * I, ProvenanceStep ** insPS);
 int IRPBINDecoder_printHeader(IRPBINDecoder const * I, FILE * out);
 int IRPBINDecoder_decodePair(IRPBINDecoder * I, IRPBinDecoderContext * context);
-int IRPBINDecoder_skipPair(IRPBINDecoder * I);
-int IRPBINDecoder_seek(IRPBINDecoder * I, uint64_t i);
+/* int IRPBINDecoder_skipPair(IRPBINDecoder * I); */
+int IRPBINDecoder_seek(IRPBINDecoder * I, IRPBinDecoderContext * context, uint64_t i);
+IRPBinDecoderContext * IRPBINDecoder_getContext(IRPBINDecoder * I);
 #endif

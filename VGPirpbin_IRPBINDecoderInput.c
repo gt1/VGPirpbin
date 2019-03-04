@@ -14,24 +14,37 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 **/
-#if ! defined(VGPIRPBIN_IRPBINDECODERCONTEXT_H)
-#define VGPIRPBIN_IRPBINDECODERCONTEXT_H
-
-#include "VGPirpbin_pre.h"
-#include "VGPirpbin_DecodeResult.h"
 #include "VGPirpbin_IRPBINDecoderInput.h"
-#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 
-typedef struct _IRPBinDecoderContext
+IRPBINDecoder_Input * IRPBINDecoder_Input_allocate(char const * fn)
 {
-        char * groupname;
-        uint64_t groupsize;
-        DecodeResult * DF;
-        DecodeResult * DR;
-        IRPBINDecoder_Input * IN;
-} IRPBinDecoderContext;
+	IRPBINDecoder_Input * I = NULL;
 
-IRPBinDecoderContext * IRPBinDecoderContext_allocate(char const * fn);
-IRPBinDecoderContext * IRPBinDecoderContext_deallocate(IRPBinDecoderContext * I);
-int IRPBinDecoderContext_printPair(IRPBinDecoderContext const * I, FILE * out);
-#endif
+	if ( ! (I = (IRPBINDecoder_Input *)malloc(sizeof(IRPBINDecoder_Input))) )
+		return IRPBINDecoder_Input_deallocate(I);
+
+	memset(I,0,sizeof(IRPBINDecoder_Input));
+
+	if ( ! (I->in = fopen(fn,"rb")) )
+		return IRPBINDecoder_Input_deallocate(I);
+
+	if ( ! (I->BLD = BitLevelDecoder_allocate(I->in)) )
+		return IRPBINDecoder_Input_deallocate(I);
+
+	return I;
+}
+
+IRPBINDecoder_Input * IRPBINDecoder_Input_deallocate(IRPBINDecoder_Input * I)
+{
+	if ( I )
+	{
+		BitLevelDecoder_deallocate(I->BLD);
+		if ( I->in )
+			fclose(I->in);
+		free(I);
+	}
+
+	return NULL;
+}
