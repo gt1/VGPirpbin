@@ -14,11 +14,12 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 **/
-#if ! defined(VGPIRPBIN_DECODEBINARYFILE_H)
-#define VGPIRPBIN_DECODEBINARYFILE_H
-
 #include "VGPirpbin_pre.h"
-#include "VGPirpbin_IRPBINDecoder.h"
+#include "VGPirpbin_getBinaryFileType.h"
 
-int VGP_IRPBIN_decodeBinaryFile(char const * fn, ProvenanceStep ** insPS);
-#endif
+char const * getBinaryFileType()
+{
+	static char const * binfiletype = "1 3 bsq 1 0\n";
+
+	return binfiletype;
+}

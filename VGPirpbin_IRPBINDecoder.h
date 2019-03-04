@@ -44,7 +44,7 @@ typedef struct _IRPBINDecoder
 /**
  * allocate decoder for binary IRP files
  **/
-IRPBINDecoder * IRPBINDecoder_allocateFromFile(char const * fn, char const * binfiletype);
+IRPBINDecoder * IRPBINDecoder_allocateFromFile(char const * fn);
 /**
  * print header of binary IRP file as text
  *

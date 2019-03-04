@@ -15,6 +15,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 **/
 #include "VGPirpbin_IRPBINDecoder.h"
+#include "VGPirpbin_getBinaryFileType.h"
 #include "VGPirpbin_IRPBINDecoderInput.h"
 #include "VGPirpbin_mstrdup.h"
 #include <stdlib.h>
@@ -512,12 +513,13 @@ IRPBINDecoder * IRPBINDecoder_deallocate(IRPBINDecoder * I)
 
 
 
-IRPBINDecoder * IRPBINDecoder_allocateFromFile(char const * fn, char const * binfiletype)
+IRPBINDecoder * IRPBINDecoder_allocateFromFile(char const * fn)
 {
 	IRPBINDecoder * I = NULL;
 	uint64_t iii = 0;
 	uint64_t ii = 0;
 	char const * cc = NULL;
+	char const * binfiletype = getBinaryFileType();
 	IRPBINDecoder_Input * IN = NULL;
 
 	if ( !(I = IRPBINDecoder_allocate()) )

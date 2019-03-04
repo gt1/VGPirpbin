@@ -15,6 +15,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 **/
 #include "VGPirpbin_pre.h"
+#include "VGPirpbin_getBinaryFileType.h"
 #include "VGPirpbin_Arguments.h"
 #include "VGPirpbin_produceBinary.h"
 #include "VGPirpbin_decodeBinaryFile.h"
@@ -22,14 +23,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* program version */
 static char const * version = "0.0";
-
-char const * getBinaryFileType()
-{
-	static char const * binfiletype = "1 3 bsq 1 0\n";
-
-	return binfiletype;
-}
 
 int main(int argc, char * argv[])
 {
@@ -105,7 +100,7 @@ int main(int argc, char * argv[])
 
 		infn = A->posArgs[1];
 
-		if ( VGP_IRPBIN_decodeBinaryFile(infn,&PS,getBinaryFileType()) < 0 )
+		if ( VGP_IRPBIN_decodeBinaryFile(infn,&PS) < 0 )
 		{
 			fprintf(stderr,"[E] failed to check binary file\n");
 			returncode = EXIT_FAILURE;

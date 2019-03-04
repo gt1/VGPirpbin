@@ -20,7 +20,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-int VGP_IRPBIN_decodeBinaryFile(char const * fn, ProvenanceStep ** insPS, char const * binfiletype)
+int VGP_IRPBIN_decodeBinaryFile(char const * fn, ProvenanceStep ** insPS)
 {
 	int returncode = 0;
 	uint64_t iii = 0;
@@ -31,7 +31,7 @@ int VGP_IRPBIN_decodeBinaryFile(char const * fn, ProvenanceStep ** insPS, char c
 	IRPBINDecoder * I = NULL;
 	IRPBinDecoderContext * context = NULL;
 
-	if ( ! (I = IRPBINDecoder_allocateFromFile(fn,binfiletype)) )
+	if ( ! (I = IRPBINDecoder_allocateFromFile(fn)) )
 	{
 		returncode = -1;
 		goto cleanup;
