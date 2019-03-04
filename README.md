@@ -155,3 +155,19 @@ cc -I${HOME}/vgp/include IRPtoFastA.c -o IRPtoFastA -L${HOME}/vgp/lib -lVGPirpbi
 
 if VGPirpbin has previously been installed at ${HOME}/vgp (using
 `PREFIX=$HOME/vgp make install`).
+
+The function `IRPBINDecoder_seek` can be used to position the input pointer
+at a given pair id in the input file:
+
+```
+/* seek to pair number 5 in the file */
+IRPBINDecoder_seek(I,context,5);
+```
+
+The return value of the function should be checked. It returns 0 for success
+and -1 otherwise.
+
+Note that while the IRPBINDecoder data structure can be shared across
+threads, this is not true for IRPBinDecoderContext.  You need to create a
+separate context for each thread (concurrently) accessing an input file.
+
