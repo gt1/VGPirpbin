@@ -23,7 +23,13 @@
 #include <string.h>
 
 static char const * version = "0.0";
-static char const * binfiletype = "1 3 bsq 1 0\n";
+
+char const * getBinaryFileType()
+{
+	static char const * binfiletype = "1 3 bsq 1 0\n";
+
+	return binfiletype;
+}
 
 int main(int argc, char * argv[])
 {
@@ -81,7 +87,7 @@ int main(int argc, char * argv[])
 		fprintf(stderr,"[V] input file name %s\n", infn);
 		fprintf(stderr,"[V] maxstatlines %ld\n", (long)maxstatlines);
 
-		if ( VGP_IRPBIN_produceBinaryFile(outfn,infn,maxstatlines,&PS,binfiletype) < 0 )
+		if ( VGP_IRPBIN_produceBinaryFile(outfn,infn,maxstatlines,&PS,getBinaryFileType()) < 0 )
 		{
 			fprintf(stderr,"[E] failed to VGP_IRPBIN_produce binary file\n");
 			returncode = EXIT_FAILURE;
@@ -99,7 +105,7 @@ int main(int argc, char * argv[])
 
 		infn = A->posArgs[1];
 
-		if ( VGP_IRPBIN_decodeBinaryFile(infn,&PS,binfiletype) < 0 )
+		if ( VGP_IRPBIN_decodeBinaryFile(infn,&PS,getBinaryFileType()) < 0 )
 		{
 			fprintf(stderr,"[E] failed to check binary file\n");
 			returncode = EXIT_FAILURE;
