@@ -27,6 +27,7 @@ int VGP_IRPBIN_decodeBinaryFile(char const * fn, ProvenanceStep ** insPS, char c
 	uint64_t s = 0;
 	time_t t;
 	time_t t0;
+	IRPBinDecoderContext * context = NULL;
 
 	IRPBINDecoder * I = NULL;
 
@@ -38,20 +39,26 @@ int VGP_IRPBIN_decodeBinaryFile(char const * fn, ProvenanceStep ** insPS, char c
 
 	IRPBINDecoder_addStep(I,insPS);
 
+	if (!(context = IRPBinDecoderContext_allocate()))
+	{
+		returncode = -1;
+		goto cleanup;
+	}
+
 	if ( IRPBINDecoder_printHeader(I,stdout) < 0 )
 	{
 		returncode = -1;
 		goto cleanup;
 	}
 
-	IRPBINDecoder_seek(I,0);
+	/* IRPBINDecoder_seek(I,0); */
 
 	t = time(NULL);
 	t0 = t;
 	while ( iii < I->nr )
 	{
 		int r0;
-		r0 = IRPBINDecoder_decodePair(I);
+		r0 = IRPBINDecoder_decodePair(I,context);
 
 		if ( r0 < 0 )
 		{
@@ -61,10 +68,10 @@ int VGP_IRPBIN_decodeBinaryFile(char const * fn, ProvenanceStep ** insPS, char c
 		else if ( r0 > 0 )
 		{
 			/* fprintf(stderr,"[V] found group\n"); */
-			fprintf(stdout,"g %lu %lu %s\n", I->groupsize, strlen(I->groupname), I->groupname);
+			fprintf(stdout,"g %lu %lu %s\n", context->groupsize, strlen(context->groupname), context->groupname);
 
-			free(I->groupname);
-			I->groupname = NULL;
+			free(context->groupname);
+			context->groupname = NULL;
 
 			continue;
 		}
@@ -73,16 +80,16 @@ int VGP_IRPBIN_decodeBinaryFile(char const * fn, ProvenanceStep ** insPS, char c
 			assert ( r0 == 0 );
 		}
 
-		if ( IRPBINDecoder_printPair(I, stdout) < 0 )
+		if ( IRPBinDecoderContext_printPair(context, stdout) < 0 )
 		{
 			fprintf(stderr,"[E] failed to print pair\n");
 			goto cleanup;
 		}
 
-		s += I->DF->S_o;
-		s += I->DR->S_o;
-		s += I->DF->Q_o;
-		s += I->DR->Q_o;
+		s += context->DF->S_o;
+		s += context->DR->S_o;
+		s += context->DF->Q_o;
+		s += context->DR->Q_o;
 
 		iii += 1;
 		if ( iii % (1024*1024)  == 0 )
@@ -97,6 +104,7 @@ int VGP_IRPBIN_decodeBinaryFile(char const * fn, ProvenanceStep ** insPS, char c
 
 	cleanup:
 	IRPBINDecoder_deallocate(I);
+	IRPBinDecoderContext_deallocate(context);
 
 	return returncode;
 }

@@ -248,6 +248,190 @@ int IRPBINDecoder_decodeSequenceAndQuality(
 	return returncode;
 }
 
+int IRPBINDecoder_skipSequenceAndQuality(
+	BitLevelDecoder * BLD,
+	QualityHuffman * QH,
+	HuffmanCode * symCode,
+	HuffmanCode * lengthsCode
+)
+{
+	/* uint64_t v; */
+	uint64_t seqlen;
+	uint64_t qlen;
+	uint64_t i;
+	int returncode = 0;
+	/* int64_t firstqual; */
+	int64_t prevqual;
+	int64_t firstqualsym;
+	int64_t llv;
+
+	if ( (llv = HuffmanCode_decodeSymbol(symCode, BLD)) < 0 || llv != 'S' )
+	{
+		fprintf(stderr,"[E] failed to find S marker after P marker\n");
+		returncode = -1;
+		goto cleanup;
+	}
+
+	if ( (llv = HuffmanCode_decodeSymbol(lengthsCode, BLD)) < 0 )
+	{
+		fprintf(stderr,"[E] failed to decode length of sequence after S marker\n");
+		returncode = -1;
+		goto cleanup;
+	}
+
+	if ( llv < VGPIRPBIN_HUFFMAN_ESCAPE_CODE )
+	{
+		seqlen = llv;
+	}
+	else
+	{
+		if ( BitLevelDecoder_decodeGamma(BLD,&seqlen) < 0 )
+		{
+			fprintf(stderr,"[E] failed to read sequence length after P marker\n");
+			returncode = -1;
+			goto cleanup;
+		}
+	}
+
+	/* fprintf(stderr,"seqlen %lu\n", (unsigned long)seqlen); */
+
+	for ( i = 0; i < seqlen; ++i )
+	{
+		uint64_t sym;
+		if ( BitLevelDecoder_decode(BLD,&sym,2) < 0 )
+		{
+			fprintf(stderr,"[E] failed to decode symbol\n");
+			returncode = -1;
+			goto cleanup;
+		}
+
+		switch ( sym )
+		{
+			case 0: sym = 'A'; break;
+			case 1: sym = 'C'; break;
+			case 2: sym = 'G'; break;
+			case 3: sym = 'T'; break;
+		}
+
+		/* fprintf(stderr,"%c", (char)sym); */
+	}
+
+	/* fprintf(stderr,"\n"); */
+
+	if ( (llv = HuffmanCode_decodeSymbol(symCode, BLD)) < 0 || llv != 'Q' )
+	{
+		fprintf(stderr,"[E] failed to find Q marker after sequence\n");
+		returncode = -1;
+		goto cleanup;
+	}
+
+	if ( (llv = HuffmanCode_decodeSymbol(lengthsCode, BLD)) < 0 )
+	{
+		fprintf(stderr,"[E] failed to decode length of sequence after Q marker\n");
+		returncode = -1;
+		goto cleanup;
+	}
+
+	if ( llv < VGPIRPBIN_HUFFMAN_ESCAPE_CODE )
+	{
+		qlen = llv;
+	}
+	else
+	{
+		if ( BitLevelDecoder_decodeGamma(BLD,&qlen) < 0 )
+		{
+			fprintf(stderr,"[E] failed to read q length after P marker\n");
+			returncode = -1;
+			goto cleanup;
+		}
+	}
+
+	/* fprintf(stderr,"qlen %lu\n", (unsigned long)qlen); */
+
+	firstqualsym = HuffmanCode_decodeSymbol(QH->firstHuf, BLD);
+
+	if ( firstqualsym < 0 )
+	{
+		fprintf(stderr,"[E] failed to read first quality value\n");
+		returncode = -1;
+		goto cleanup;
+	}
+
+	if ( firstqualsym == VGPIRPBIN_HUFFMAN_ESCAPE_CODE )
+	{
+		uint64_t v;
+
+		if ( BitLevelDecoder_decodeGamma(BLD,&v) < 0 )
+		{
+			fprintf(stderr,"[E] failed to read first quality value\n");
+			returncode = -1;
+			goto cleanup;
+		}
+
+		firstqualsym = v;
+	}
+
+	/* firstqual = reverseQualityTable[firstqualsym]; */
+	prevqual = firstqualsym;
+
+	/* fprintf(stderr,"firstqualsym %d firstqual %d\n", (int)firstqualsym, (int)firstqual); */
+	/* fprintf(stderr,"%c",(char)(firstqual + VGPIRPBIN_PHREDSHIFT)); */
+	/* D->Q[0] = firstqual + VGPIRPBIN_PHREDSHIFT; */
+
+	for ( i = 1; i < qlen; ++i )
+	{
+		int64_t difsym;
+		int64_t dif;
+		int64_t nextqual;
+		/* int64_t nextqualvalue; */
+
+		difsym = HuffmanCode_decodeSymbol(QH->difHuf, BLD);
+
+		if ( difsym < 0 )
+		{
+			fprintf(stderr,"[E] failed to read quality dif value\n");
+			returncode = -1;
+			goto cleanup;
+		}
+
+		if ( difsym == VGPIRPBIN_HUFFMAN_ESCAPE_CODE )
+		{
+			uint64_t v;
+
+			if ( BitLevelDecoder_decodeGamma(BLD,&v) < 0 )
+			{
+				fprintf(stderr,"[E] failed to read quality dif value\n");
+				returncode = -1;
+				goto cleanup;
+			}
+
+			difsym = v;
+		}
+
+		if ( (difsym & 1) )
+			dif = -(difsym ^ 1)/2;
+		else
+			dif =  (difsym/2) - 1;
+
+		nextqual      = prevqual + dif;
+		/* nextqualvalue = reverseQualityTable[nextqual]; */
+
+		/* fprintf(stderr,"nextqualsym %d nextqual %d sym %c\n", (int)nextqual, (int)nextqualvalue, (char)(nextqualvalue+VGPIRPBIN_PHREDSHIFT)); */
+		/* fprintf(stderr,"%c",(int)(nextqualvalue+VGPIRPBIN_PHREDSHIFT)); */
+		/* D->Q[i] = nextqualvalue + VGPIRPBIN_PHREDSHIFT; */
+
+		prevqual = nextqual;
+	}
+
+	/* fprintf(stderr,"\n"); */
+
+	/* D->Q_l = qlen; */
+
+	cleanup:
+
+	return returncode;
+}
+
 IRPBINDecoder * IRPBINDecoder_deallocate(IRPBINDecoder * I)
 {
 	if ( I )
@@ -256,8 +440,10 @@ IRPBINDecoder * IRPBINDecoder_deallocate(IRPBINDecoder * I)
 			fclose(I->in);
 		QualityHuffman_deallocate(I->QH);
 		BitLevelDecoder_deallocate(I->BLD);
+		#if 0
 		DecodeResult_deallocate(I->DF);
 		DecodeResult_deallocate(I->DR);
+		#endif
 		free(I->reverseQualityTable);
 		free(I->HSL);
 		ProvenanceStep_deallocate(I->PS);
@@ -281,11 +467,13 @@ IRPBINDecoder * IRPBINDecoder_allocate()
 
 	memset(I,0,sizeof(IRPBINDecoder));
 
+	#if 0
 	if ( !(I->DF = DecodeResult_allocate()) )
 		return IRPBINDecoder_deallocate(I);
 
 	if ( !(I->DR = DecodeResult_allocate()) )
 		return IRPBINDecoder_deallocate(I);
+	#endif
 
 	return I;
 }
@@ -508,7 +696,7 @@ int IRPBINDecoder_printHeader(IRPBINDecoder const * I, FILE * out)
 	return returncode;
 }
 
-int IRPBINDecoder_decodePair(IRPBINDecoder * I)
+int IRPBINDecoder_decodePair(IRPBINDecoder * I,  IRPBinDecoderContext * context)
 {
 	int64_t llv;
 	if ( (llv = HuffmanCode_decodeSymbol(I->symCode, I->BLD)) < 0 )
@@ -542,8 +730,8 @@ int IRPBINDecoder_decodePair(IRPBINDecoder * I)
 
 			/* fprintf(stderr,"[V] found group %s of size %lu\n", groupname, (unsigned long)groupsize); */
 
-			I->groupname = groupname;
-			I->groupsize = groupsize;
+			context->groupname = groupname;
+			context->groupsize = groupsize;
 
 			/* free(groupname); */
 
@@ -557,13 +745,13 @@ int IRPBINDecoder_decodePair(IRPBINDecoder * I)
 		}
 	}
 
-	if ( IRPBINDecoder_decodeSequenceAndQuality(I->BLD,I->QH,I->symCode,I->lengthsCode,I->reverseQualityTable,I->DF) < 0 )
+	if ( IRPBINDecoder_decodeSequenceAndQuality(I->BLD,I->QH,I->symCode,I->lengthsCode,I->reverseQualityTable,context->DF) < 0 )
 	{
 		fprintf(stderr,"[E] unable to read forward data\n");
 		return -1;
 	}
 
-	if ( IRPBINDecoder_decodeSequenceAndQuality(I->BLD,I->QH,I->symCode,I->lengthsCode,I->reverseQualityTable,I->DR) < 0 )
+	if ( IRPBINDecoder_decodeSequenceAndQuality(I->BLD,I->QH,I->symCode,I->lengthsCode,I->reverseQualityTable,context->DR) < 0 )
 	{
 		fprintf(stderr,"[E] unable to read reverse data\n");
 		return -1;
@@ -572,42 +760,68 @@ int IRPBINDecoder_decodePair(IRPBINDecoder * I)
 	return 0;
 }
 
-int IRPBINDecoder_printPair(IRPBINDecoder const * I, FILE * out)
+int IRPBINDecoder_skipPair(IRPBINDecoder * I)
 {
-	if ( fprintf(out,"P\n") < 0 )
+	int64_t llv;
+	if ( (llv = HuffmanCode_decodeSymbol(I->symCode, I->BLD)) < 0 )
+	{
+		fprintf(stderr,"[E] unable to read marker\n");
 		return -1;
+	}
 
-	if ( fprintf(out,"S %lu ",(unsigned long)I->DF->S_l) < 0 )
-		return -1;
-	if ( fwrite(I->DF->S,I->DF->S_l,1,out) != 1 )
-		return -1;
-	if ( fprintf(out,"\n") < 0 )
-		return -1;
+	switch ( llv )
+	{
+		case 'P':
+		{
+			break;
+		}
+		case 'g':
+		{
+			uint64_t groupsize;
+			char * groupname = NULL;
 
-	if ( fprintf(out,"Q %lu ",(unsigned long)I->DF->Q_l) < 0 )
-		return -1;
-	if ( fwrite(I->DF->Q,I->DF->Q_l,1,out) != 1 )
-		return -1;
-	if ( fprintf(out,"\n") < 0 )
-		return -1;
+			if ( BitLevelDecoder_decodeGamma(I->BLD,&groupsize) < 0 )
+			{
+				fprintf(stderr,"[E] failed to read group size after g marker\n");
+				return -1;
+			}
 
-	if ( fprintf(out,"S %lu ",(unsigned long)I->DR->S_l) < 0 )
-		return -1;
-	if ( fwrite(I->DR->S,I->DR->S_l,1,out) != 1 )
-		return -1;
-	if ( fprintf(out,"\n") < 0 )
-		return -1;
+			if ( ! (groupname = BitLevelDecoder_decodeString(I->BLD)) )
+			{
+				fprintf(stderr,"[E] failed to read group name after g marker\n");
+				return -1;
+			}
 
-	if ( fprintf(out,"Q %lu ",(unsigned long)I->DR->Q_l) < 0 )
+			/* fprintf(stderr,"[V] found group %s of size %lu\n", groupname, (unsigned long)groupsize); */
+
+			free(groupname);
+
+			/* free(groupname); */
+
+			return 1;
+		}
+		default:
+		{
+			fprintf(stderr,"[E] unknown marker %c\n", (char)llv);
+			return -1;
+			break;
+		}
+	}
+
+	if ( IRPBINDecoder_skipSequenceAndQuality(I->BLD,I->QH,I->symCode,I->lengthsCode) < 0 )
+	{
+		fprintf(stderr,"[E] unable to read forward data\n");
 		return -1;
-	if ( fwrite(I->DR->Q,I->DR->Q_l,1,out) != 1 )
+	}
+
+	if ( IRPBINDecoder_skipSequenceAndQuality(I->BLD,I->QH,I->symCode,I->lengthsCode) < 0 )
+	{
+		fprintf(stderr,"[E] unable to read reverse data\n");
 		return -1;
-	if ( fprintf(out,"\n") < 0 )
-		return -1;
+	}
 
 	return 0;
 }
-
 
 int IRPBINDecoder_seek(IRPBINDecoder * I, uint64_t i)
 {
@@ -634,7 +848,7 @@ int IRPBINDecoder_seek(IRPBINDecoder * I, uint64_t i)
 
 	while ( blockmod )
 	{
-		int const r = IRPBINDecoder_decodePair(I);
+		int const r = IRPBINDecoder_skipPair(I);
 
 		if ( r < 0 )
 			return -1;

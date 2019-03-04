@@ -22,14 +22,13 @@
 #include "VGPirpbin_DecodeResult.h"
 #include "VGPirpbin_HeaderStatsLine.h"
 #include "VGPirpbin_ProvenanceStep.h"
+#include "VGPirpbin_IRPBinDecoderContext.h"
 
 typedef struct _IRPBINDecoder
 {
 	FILE * in;
 	QualityHuffman * QH;
 	BitLevelDecoder * BLD;
-	DecodeResult * DF;
-	DecodeResult * DR;
 	uint64_t reverseQualityTableSize;
 	uint64_t * reverseQualityTable;
 	uint64_t HSLo;
@@ -40,8 +39,6 @@ typedef struct _IRPBINDecoder
 	uint64_t nr;
 	uint64_t indexmod;
 	uint64_t indexpos;
-	char * groupname;
-	uint64_t groupsize;
 } IRPBINDecoder;
 
 int IRPBINDecoder_decodeSequenceAndQuality(
@@ -52,12 +49,18 @@ int IRPBINDecoder_decodeSequenceAndQuality(
 	uint64_t * reverseQualityTable,
 	DecodeResult * D
 );
+int IRPBINDecoder_skipSequenceAndQuality(
+	BitLevelDecoder * BLD,
+	QualityHuffman * QH,
+	HuffmanCode * symCode,
+	HuffmanCode * lengthsCode
+);
 IRPBINDecoder * IRPBINDecoder_deallocate(IRPBINDecoder * I);
 IRPBINDecoder * IRPBINDecoder_allocate();
 IRPBINDecoder * IRPBINDecoder_allocateFromFile(char const * fn, char const * binfiletype);
 void IRPBINDecoder_addStep(IRPBINDecoder * I, ProvenanceStep ** insPS);
 int IRPBINDecoder_printHeader(IRPBINDecoder const * I, FILE * out);
-int IRPBINDecoder_decodePair(IRPBINDecoder * I);
-int IRPBINDecoder_printPair(IRPBINDecoder const * I, FILE * out);
+int IRPBINDecoder_decodePair(IRPBINDecoder * I, IRPBinDecoderContext * context);
+int IRPBINDecoder_skipPair(IRPBINDecoder * I);
 int IRPBINDecoder_seek(IRPBINDecoder * I, uint64_t i);
 #endif
